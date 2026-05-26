@@ -409,6 +409,22 @@
             "chance": "100%",
             "trigger_cooldown": 0,
             "enabled": "true"
+        },
+        {
+            "trigger_word": "quack",
+            "sound": "https://pub-c49a4bdf348c4d8a9f4415aa3a1551c4.r2.dev/Quack.ogg",
+            "volume": 0.25,
+            "chance": "100%",
+            "trigger_cooldown": 0,
+            "enabled": "true"
+        },
+        {
+            "trigger_word": "Quack",
+            "sound": "https://pub-c49a4bdf348c4d8a9f4415aa3a1551c4.r2.dev/Quack.ogg",
+            "volume": 0.25,
+            "chance": "100%",
+            "trigger_cooldown": 0,
+            "enabled": "true"
         }
     ]
 }
