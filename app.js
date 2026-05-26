@@ -160,7 +160,7 @@ async function resolve7TVEmote(sevenTvUrl) {
 // Try to load user list from lists/index.json, fall back to hardcoded object
 async function loadUserFiles() {
     try {
-        const res = await fetch("lists/index.json");
+        const res = await fetch("lists/index.json", { cache: "no-cache" });
         if (res.ok) {
             console.log("Loaded user list from lists/index.json");
             return await res.json();
@@ -172,9 +172,9 @@ async function loadUserFiles() {
 
 async function loadResources() {
     try {
-        const resTriggers = await fetch("lists/internals/IconTriggers2.json");
+        const resTriggers = await fetch("lists/internals/IconTriggers2.json", { cache: "no-cache" });
         triggerImages = await resTriggers.json();
-        const resAvatars = await fetch("lists/internals/avatars.json");
+        const resAvatars = await fetch("lists/internals/avatars.json", { cache: "no-cache" });
         avatars = await resAvatars.json();
     } catch(err) {
         console.error("Failed to load resources:", err);
@@ -289,7 +289,7 @@ function displayUserLists() {
     Object.keys(userFiles).forEach(async user => {
         if (listCache.has(user)) return;
         try {
-            const res = await fetch(userFiles[user]);
+            const res = await fetch(userFiles[user], { cache: "no-cache" });
             const data = await res.json();
             const list = Array.isArray(data) ? data : Object.values(data).find(v => Array.isArray(v)) || [];
             listCache.set(user, list);
@@ -311,7 +311,7 @@ async function loadList(user, push = true) {
         if (listCache.has(user)) {
             list = listCache.get(user);
         } else {
-            const res = await fetch(userFiles[user]);
+            const res = await fetch(userFiles[user], { cache: "no-cache" });
             const data = await res.json();
             list = Array.isArray(data) ? data : Object.values(data).find(v => Array.isArray(v)) || [];
             listCache.set(user, list);
