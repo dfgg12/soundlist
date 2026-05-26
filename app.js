@@ -1,4 +1,4 @@
-// ================== CONFIG (point 9) ==================
+// ================== CONFIG ==================
 // Fallback user list — used only if lists/index.json is not found.
 // To add streamers without touching this file, create lists/index.json instead.
 const FALLBACK_USER_FILES = {
@@ -35,10 +35,11 @@ const FALLBACK_EMOTE_IMAGE = "https://files.catbox.moe/ab5icu.png";
 let userFiles = {};
 let triggerImages = {};
 let avatars = {};
-const listCache = new Map();     // point 3: cache parsed JSON per user
-const globalSources = [];        // point 2: off window, module-level
+const listCache = new Map();     // cache parsed JSON per user after first load
+const globalSources = [];        // all active AudioBufferSourceNodes
+let _renderGen = 0;              // incremented on every navigation; aborts stale async renders
 
-// ================== AUDIO CONTEXT (point 1) ==================
+// ================== AUDIO CONTEXT ==================
 // Created lazily on first play to avoid browser autoplay warnings.
 let _audioCtx = null;
 function getAudioContext() {
@@ -50,6 +51,17 @@ function getAudioContext() {
 }
 
 // ================== UTILITY FUNCTIONS ==================
+
+// Append glow divs required by the notification card design
+// https://uiverse.io/SouravBandyopadhyay/rude-tiger-29
+function addCardGlows(div) {
+    const notiglow = document.createElement("div");
+    notiglow.className = "notiglow";
+    const notiborderglow = document.createElement("div");
+    notiborderglow.className = "notiborderglow";
+    div.prepend(notiborderglow);
+    div.prepend(notiglow);
+}
 
 // Fetch + decode audio buffer
 async function fetchAndDecode(url) {
@@ -97,7 +109,7 @@ function createReversedBuffer(srcBuffer) {
     return rev;
 }
 
-// Extract a readable filename from a sound URL (point 8)
+// Extract a readable filename from a sound URL
 function getSoundFilename(sound) {
     const url = Array.isArray(sound)
         ? (sound[0]?.clip || sound[0] || "")
@@ -145,7 +157,7 @@ async function resolve7TVEmote(sevenTvUrl) {
 
 // ================== RESOURCE LOADING ==================
 
-// point 9: Try to load user list from lists/index.json, fall back to hardcoded object
+// Try to load user list from lists/index.json, fall back to hardcoded object
 async function loadUserFiles() {
     try {
         const res = await fetch("lists/index.json");
@@ -172,14 +184,27 @@ async function loadResources() {
 
 // ================== DOM HELPERS ==================
 
+function createDarkModeToggle() {
+    const label = document.createElement("label");
+    label.className = "switch";
+    const input = document.createElement("input");
+    input.type = "checkbox";
+    input.checked = document.body.classList.contains("lightmode");
+    const span = document.createElement("span");
+    span.className = "slider";
+    label.appendChild(input);
+    label.appendChild(span);
+    input.addEventListener("change", () => {
+        document.body.classList.toggle("lightmode", input.checked);
+    });
+    return label;
+}
+
 function createBackButton() {
     const btn = document.createElement("button");
     btn.textContent = "⬅ Back";
     btn.className = "back-btn";
-    btn.addEventListener("click", () => {
-        history.replaceState(null, "", " ");
-        displayUserLists();
-    });
+    btn.addEventListener("click", () => history.back());
     return btn;
 }
 
@@ -195,62 +220,94 @@ function createSearchInput(placeholder, extraClass = "") {
 
 // Show main user list
 function displayUserLists() {
+    const myGen = ++_renderGen;
     const container = document.getElementById("list");
     container.innerHTML = "";
 
-    const searchInput = createSearchInput("Search users...", "user-search");
-    container.appendChild(searchInput);
+    const panel = document.createElement("div");
+    panel.className = "list-panel";
+    container.appendChild(panel);
 
-    const userDivs = [];
+    const searchRow = document.createElement("div");
+    searchRow.className = "search-toggle-row";
+    const searchInput = createSearchInput("Search streamers...", "user-search");
+    searchRow.appendChild(searchInput);
+    searchRow.appendChild(createDarkModeToggle());
+    panel.appendChild(searchRow);
+
+    const grid = document.createElement("div");
+    grid.className = "streamer-grid";
+    panel.appendChild(grid);
+
+    const streamerDivs = [];
+    const countBadges = {};
 
     Object.keys(userFiles).forEach(user => {
         const div = document.createElement("div");
-        div.className = "sound-item";
-        div.style.cursor = "pointer";
+        div.className = "streamer-card";
+        addCardGlows(div);
 
+        const avatarLink = document.createElement("a");
+        avatarLink.href = `https://twitch.tv/${user}`;
+        avatarLink.target = "_blank";
         const img = document.createElement("img");
         img.src = avatars[user] || "https://static.twitchcdn.net/assets/favicon-32-e29e246c157142c94346.png";
         img.alt = user;
+        img.className = "streamer-avatar";
+        avatarLink.appendChild(img);
+        div.appendChild(avatarLink);
 
-        const link = document.createElement("a");
-        link.href = `https://twitch.tv/${user}`;
-        link.target = "_blank";
-        link.appendChild(img);
-        div.appendChild(link);
+        const nameEl = document.createElement("div");
+        nameEl.className = "streamer-card-name";
+        nameEl.textContent = user;
+        div.appendChild(nameEl);
 
-        const text = document.createElement("div");
-        const strong = document.createElement("strong");
-        strong.textContent = user;
-        const span = document.createElement("span");
-        span.textContent = "Click to view sounds";
-        text.appendChild(strong);
-        text.appendChild(document.createElement("br"));
-        text.appendChild(span);
-        div.appendChild(text);
+        const badge = document.createElement("span");
+        badge.className = "sound-count-badge";
+        const cached = listCache.get(user);
+        badge.textContent = cached ? `${cached.length} sounds` : "-- sounds";
+        countBadges[user] = badge;
+        div.appendChild(badge);
 
         div.addEventListener("click", e => {
             if (e.target.closest("a")) return;
             loadList(user);
         });
 
-        container.appendChild(div);
-        userDivs.push({ div, name: user.toLowerCase() });
+        grid.appendChild(div);
+        streamerDivs.push({ div, name: user.toLowerCase() });
     });
 
     searchInput.addEventListener("input", () => {
         const query = searchInput.value.toLowerCase();
-        userDivs.forEach(obj => {
+        streamerDivs.forEach(obj => {
             obj.div.style.display = obj.name.includes(query) ? "flex" : "none";
         });
+    });
+
+    // Load sound counts in background for uncached streamers
+    Object.keys(userFiles).forEach(async user => {
+        if (listCache.has(user)) return;
+        try {
+            const res = await fetch(userFiles[user]);
+            const data = await res.json();
+            const list = Array.isArray(data) ? data : Object.values(data).find(v => Array.isArray(v)) || [];
+            listCache.set(user, list);
+            if (_renderGen === myGen && countBadges[user]) {
+                countBadges[user].textContent = `${list.length} sounds`;
+            }
+        } catch { /* non-critical */ }
     });
 }
 
 // Load and display a specific user's sounds
-async function loadList(user) {
+// push=true when the user clicks a streamer (adds a history entry);
+// push=false when called from popstate or initial load (URL is already correct).
+async function loadList(user, push = true) {
     try {
         let list;
 
-        // point 3: use cached JSON if available
+        // use cached JSON if available
         if (listCache.has(user)) {
             list = listCache.get(user);
         } else {
@@ -260,7 +317,7 @@ async function loadList(user) {
             listCache.set(user, list);
         }
 
-        history.replaceState(null, "", "#" + user);
+        if (push) history.pushState(null, "", "#" + user);
         displaySoundList(list, user);
     } catch(err) {
         console.error("Error loading list:", err);
@@ -277,25 +334,58 @@ async function loadList(user) {
 
 // Render sound list for a user
 async function displaySoundList(list, user) {
+    const myGen = ++_renderGen;
     const container = document.getElementById("list");
     container.innerHTML = "";
 
-    const headerWrapper = document.createElement("div");
-    headerWrapper.className = "header-wrapper";
-    headerWrapper.appendChild(createBackButton());
+    // Streamer mini-header
+    const header = document.createElement("div");
+    header.className = "sound-list-header";
+    header.appendChild(createBackButton());
 
+    const infoBadge = document.createElement("div");
+    infoBadge.className = "streamer-info-badge";
+    const headerAvatar = document.createElement("img");
+    headerAvatar.src = avatars[user] || "https://static.twitchcdn.net/assets/favicon-32-e29e246c157142c94346.png";
+    headerAvatar.alt = user;
+    headerAvatar.className = "header-avatar";
+    const headerName = document.createElement("span");
+    headerName.className = "header-username";
+    headerName.textContent = user;
+    infoBadge.appendChild(headerAvatar);
+    infoBadge.appendChild(headerName);
+    header.appendChild(infoBadge);
+
+    header.appendChild(createDarkModeToggle());
     const searchInput = createSearchInput("Search emotes...");
-    headerWrapper.appendChild(searchInput);
-    container.appendChild(headerWrapper);
+    header.appendChild(searchInput);
+    container.appendChild(header);
+
+    // Glass panel wrapping all sound cards
+    const panel = document.createElement("div");
+    panel.className = "list-panel";
+    container.appendChild(panel);
 
     if (!list.length) {
         const p = document.createElement("p");
         p.textContent = "No sounds found.";
-        container.appendChild(p);
+        panel.appendChild(p);
         return;
     }
 
+    const soundGrid = document.createElement("div");
+    soundGrid.className = "sound-grid";
+    panel.appendChild(soundGrid);
+
     const emoteDivs = [];
+
+    // Attach search listener before the loop so it works during async loading
+    searchInput.addEventListener("input", () => {
+        const query = searchInput.value.toLowerCase();
+        emoteDivs.forEach(obj => {
+            obj.div.style.display = obj.trigger_word.includes(query) ? "flex" : "none";
+        });
+    });
 
     for (const item of list) {
         if (!item.enabled || item.enabled !== "true") continue;
@@ -303,6 +393,7 @@ async function displaySoundList(list, user) {
         const div = document.createElement("div");
         div.className = "sound-item";
         div.style.position = "relative";
+        addCardGlows(div);
 
         // Loader
         const loader = document.createElement("div");
@@ -346,42 +437,115 @@ async function displaySoundList(list, user) {
         text.className = "sound-text";
         const strong = document.createElement("strong");
         strong.textContent = item.trigger_word;
-
-        // point 8: show actual filename instead of generic "Sound Link"
-        const soundLink = document.createElement("a");
-        soundLink.href = getSoundLinkUrl(item.sound);
-        soundLink.target = "_blank";
-        soundLink.textContent = getSoundFilename(item.sound);
-
         text.appendChild(strong);
         text.appendChild(document.createElement("br"));
-        text.appendChild(soundLink);
+
+        const isMultiSound = Array.isArray(item.sound) && item.sound.length > 1;
+
+        if (isMultiSound) {
+            // Badge that toggles a clip list
+            const isWeighted = typeof item.sound[0] === "object";
+
+            const badge = document.createElement("button");
+            badge.className = "multi-sound-badge";
+            badge.textContent = `🎲 ${item.sound.length} clips ▾`;
+
+            const clipList = document.createElement("div");
+            clipList.className = "multi-sound-list";
+            clipList.hidden = true;
+
+            badge.addEventListener("click", e => {
+                e.stopPropagation();
+                clipList.hidden = !clipList.hidden;
+                badge.textContent = clipList.hidden
+                    ? `🎲 ${item.sound.length} clips ▾`
+                    : `🎲 ${item.sound.length} clips ▴`;
+            });
+
+            const equalChance = Math.round(100 / item.sound.length);
+
+            item.sound.forEach(s => {
+                const url    = isWeighted ? s.clip : s;
+                const chance = isWeighted ? s.chance : equalChance;
+
+                const entry = document.createElement("div");
+                entry.className = "multi-sound-entry";
+
+                const link = document.createElement("a");
+                link.href = url;
+                link.target = "_blank";
+                link.textContent = getSoundFilename(url);
+                entry.appendChild(link);
+
+                const pct = document.createElement("span");
+                pct.className = "multi-sound-chance";
+                pct.textContent = `${String(chance).replace(/%/g, "")}%`;
+                entry.appendChild(pct);
+
+                clipList.appendChild(entry);
+            });
+
+            text.appendChild(badge);
+            text.appendChild(clipList);
+        } else {
+            // Single sound — show filename link as before
+            const soundLink = document.createElement("a");
+            soundLink.href = getSoundLinkUrl(item.sound);
+            soundLink.target = "_blank";
+            soundLink.textContent = getSoundFilename(item.sound);
+            text.appendChild(soundLink);
+        }
+
         div.appendChild(text);
 
         // Controls
         const controls = document.createElement("div");
         controls.className = "sound-controls";
+        controls.addEventListener("click", e => e.stopPropagation());
 
-        // Volume
+        // Volume — https://uiverse.io/byllzz/fluffy-hound-44
         const volWrapper = document.createElement("div");
-        volWrapper.className = "vol-wrapper";
+        volWrapper.className = "slider-row";
         const volLabel = document.createElement("label");
         volLabel.textContent = "Vol";
+        const volContent = document.createElement("div");
+        volContent.className = "slider-content";
+        const volSliderWrap = document.createElement("div");
+        volSliderWrap.className = "slider-wrapper";
         const volInput = document.createElement("input");
         volInput.type = "range"; volInput.min = "0"; volInput.max = "100";
+        volInput.className = "custom-slider";
         volInput.value = typeof item.volume === "number" ? Math.round(item.volume * 100) : 50;
+        const volDivider = document.createElement("div");
+        volDivider.className = "slider-divider";
+        const volDisplay = document.createElement("span");
+        volDisplay.className = "slider-value";
+        volDisplay.textContent = volInput.value;
+        volInput.addEventListener("input", () => { volDisplay.textContent = volInput.value; });
+        volSliderWrap.appendChild(volInput);
+        volContent.appendChild(volSliderWrap);
+        volContent.appendChild(volDivider);
+        volContent.appendChild(volDisplay);
         volWrapper.appendChild(volLabel);
-        volWrapper.appendChild(volInput);
+        volWrapper.appendChild(volContent);
 
         // Speed
         const pitchRow = document.createElement("div");
-        pitchRow.className = "pitch-row";
+        pitchRow.className = "slider-row";
         const pitchLabel = document.createElement("label");
-        pitchLabel.textContent = "Speed";
+        pitchLabel.textContent = "Spd";
+        const pitchContent = document.createElement("div");
+        pitchContent.className = "slider-content";
         const pitchInput = document.createElement("input");
-        pitchInput.type = "number"; pitchInput.min = "50"; pitchInput.max = "200"; pitchInput.value = "100";
+        pitchInput.type = "number"; pitchInput.value = "100";
+        pitchInput.className = "speed-input";
+        const pitchPct = document.createElement("span");
+        pitchPct.className = "slider-value";
+        pitchPct.textContent = "%";
+        pitchContent.appendChild(pitchInput);
+        pitchContent.appendChild(pitchPct);
         pitchRow.appendChild(pitchLabel);
-        pitchRow.appendChild(pitchInput);
+        pitchRow.appendChild(pitchContent);
 
         // Buttons
         const reverseBtn = document.createElement("button");
@@ -393,16 +557,20 @@ async function displaySoundList(list, user) {
         stopBtn.textContent = "Stop All";
         stopBtn.className = "stop-btn";
 
+        const btnRow = document.createElement("div");
+        btnRow.className = "btn-row";
+        btnRow.appendChild(reverseBtn);
+        btnRow.appendChild(stopBtn);
+
         controls.appendChild(volWrapper);
         controls.appendChild(pitchRow);
-        controls.appendChild(reverseBtn);
-        controls.appendChild(stopBtn);
+        controls.appendChild(btnRow);
         div.appendChild(controls);
 
         // ================== AUDIO HANDLING ==================
         const bufferCache = new Map();
         const reversedCache = new Map();
-        let playingCount = 0; // point 7: track active sources per card
+        let playingCount = 0; // track active sources per card for the playing glow
 
         async function getBufferForUrl(url) {
             if (bufferCache.has(url)) return bufferCache.get(url);
@@ -434,7 +602,7 @@ async function displaySoundList(list, user) {
                 chosenUrl = item.sound;
             }
 
-            const ctx = getAudioContext(); // point 1: lazy context
+            const ctx = getAudioContext();
             const buf = await getBufferForUrl(chosenUrl);
 
             let bufferToPlay = buf;
@@ -445,16 +613,15 @@ async function displaySoundList(list, user) {
 
             const src = ctx.createBufferSource();
             src.buffer = bufferToPlay;
-            globalSources.push(src); // point 2: module-level array
+            globalSources.push(src);
 
             const gainNode = ctx.createGain();
-            gainNode.gain.value = ((parseFloat(volInput.value) || 50) / 100) * (perSoundVolume != null ? perSoundVolume : 1);
+            gainNode.gain.value = (parseFloat(volInput.value) / 100) * (perSoundVolume != null ? perSoundVolume : 1);
             src.playbackRate.value = Math.max(0.01, (parseFloat(pitchInput.value) || 100) / 100);
 
             src.connect(gainNode).connect(ctx.destination);
             src.start(0);
 
-            // point 7: add playing glow when sound starts
             playingCount++;
             div.classList.add("playing");
 
@@ -463,7 +630,7 @@ async function displaySoundList(list, user) {
                 const idx = globalSources.indexOf(src);
                 if (idx !== -1) globalSources.splice(idx, 1);
 
-                // point 7: remove glow only when all sources from this card are done
+                // remove glow only when all sources from this card are done
                 playingCount--;
                 if (playingCount <= 0) {
                     playingCount = 0;
@@ -476,7 +643,7 @@ async function displaySoundList(list, user) {
 
         div.addEventListener("click", e => {
             if (e.target.closest("a")) return;
-            // point 4: visual error feedback on failed playback
+            // visual error flash on failed playback
             playRandomBuffer({ reversed: false }).catch(err => {
                 console.error("Playback error:", err);
                 div.classList.remove("sound-error");
@@ -503,42 +670,131 @@ async function displaySoundList(list, user) {
             if (ev.key === "Enter") ev.target.blur();
         });
 
-        container.appendChild(div);
+        if (_renderGen !== myGen) return; // user navigated away — abort stale render
+        // Apply active search filter before inserting so the card isn't briefly visible
+        const currentQuery = searchInput.value.toLowerCase();
+        if (currentQuery && !item.trigger_word.toLowerCase().includes(currentQuery)) {
+            div.style.display = "none";
+        }
+        soundGrid.appendChild(div);
         emoteDivs.push({ div, trigger_word: item.trigger_word.toLowerCase() });
     }
 
-    searchInput.addEventListener("input", () => {
-        const query = searchInput.value.toLowerCase();
-        emoteDivs.forEach(obj => {
-            obj.div.style.display = obj.trigger_word.includes(query) ? "flex" : "none";
-        });
-    });
 }
 
-// ================== HASH NAVIGATION ==================
-window.addEventListener("hashchange", () => {
-    const hashUser = window.location.hash.slice(1);
-    if (hashUser && userFiles[hashUser]) loadList(hashUser);
-    else displayUserLists();
-});
+// ================== PARTICLE BACKGROUND ==================
+(function initParticles() {
+    const canvas = document.getElementById("bg-canvas");
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
 
-// ================== DARK/LIGHT MODE TOGGLE ==================
-const darkModeSwitch = document.getElementById("darkModeSwitch").querySelector("input");
-darkModeSwitch.checked = document.body.classList.contains("lightmode");
-darkModeSwitch.addEventListener("change", () => {
-    document.body.classList.toggle("lightmode", darkModeSwitch.checked);
+    const COUNT      = 90;
+    const MAX_DIST   = 160;   // px — max distance to draw a connecting line
+    const SPEED      = 0.35;  // base movement speed (px per frame)
+    const DOT_R      = 2;     // dot radius
+    const MAX_DIST2  = MAX_DIST * MAX_DIST; // pre-squared for hot-path comparison
+
+    let particles = [];
+    let W = 0, H = 0;
+
+    function resize() {
+        W = canvas.width  = window.innerWidth;
+        H = canvas.height = window.innerHeight;
+    }
+
+    function makeParticle() {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = SPEED * (0.5 + Math.random() * 0.5);
+        return {
+            x:  Math.random() * W,
+            y:  Math.random() * H,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+        };
+    }
+
+    function init() {
+        resize();
+        particles = Array.from({ length: COUNT }, makeParticle);
+    }
+
+    function tick() {
+        ctx.clearRect(0, 0, W, H);
+
+        // Move + wrap
+        for (const p of particles) {
+            p.x += p.vx;
+            p.y += p.vy;
+            if (p.x < -5)    p.x = W + 5;
+            else if (p.x > W + 5) p.x = -5;
+            if (p.y < -5)    p.y = H + 5;
+            else if (p.y > H + 5) p.y = -5;
+        }
+
+        // Pick colours based on current mode
+        const light = document.body.classList.contains("lightmode");
+        const dotColor  = light ? "rgba(20, 30, 90, 0.7)"  : "rgba(180, 215, 255, 0.75)";
+        const lineBase  = light ? "20, 30, 90"              : "160, 200, 255";
+        const lineAlphaScale = light ? 0.35 : 0.45;
+
+        // Connecting lines (distance-squared check avoids sqrt on cold path)
+        for (let i = 0; i < particles.length; i++) {
+            for (let j = i + 1; j < particles.length; j++) {
+                const dx = particles[i].x - particles[j].x;
+                const dy = particles[i].y - particles[j].y;
+                const d2 = dx * dx + dy * dy;
+                if (d2 < MAX_DIST2) {
+                    const alpha = (1 - Math.sqrt(d2) / MAX_DIST) * lineAlphaScale;
+                    ctx.beginPath();
+                    ctx.moveTo(particles[i].x, particles[i].y);
+                    ctx.lineTo(particles[j].x, particles[j].y);
+                    ctx.strokeStyle = `rgba(${lineBase}, ${alpha})`;
+                    ctx.lineWidth = 0.8;
+                    ctx.stroke();
+                }
+            }
+        }
+
+        // Dots (drawn on top of lines)
+        ctx.fillStyle = dotColor;
+        for (const p of particles) {
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, DOT_R, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        requestAnimationFrame(tick);
+    }
+
+    // Debounced resize — reinitialise so particles stay in-bounds
+    let resizeTimer;
+    window.addEventListener("resize", () => {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(init, 200);
+    });
+
+    init();
+    tick();
+})();
+
+// ================== HISTORY NAVIGATION ==================
+// popstate fires when the user presses back/forward (or history.back() is called).
+// pass push=false so we don't stack a duplicate entry on top.
+window.addEventListener("popstate", () => {
+    const hashUser = window.location.hash.slice(1);
+    if (hashUser && userFiles[hashUser]) loadList(hashUser, false);
+    else displayUserLists();
 });
 
 // ================== INIT ==================
 window.addEventListener("DOMContentLoaded", async () => {
-    // point 10: show loading state immediately before anything fetches
     const listEl = document.getElementById("list");
     listEl.innerHTML = "<p class='loading-msg'>Loading...</p>";
 
     await loadResources();
-    userFiles = await loadUserFiles(); // point 9
+    userFiles = await loadUserFiles();
 
     const hashUser = window.location.hash.slice(1);
-    if (hashUser && userFiles[hashUser]) loadList(hashUser);
+    if (hashUser && userFiles[hashUser]) loadList(hashUser, false);
     else displayUserLists();
 });
