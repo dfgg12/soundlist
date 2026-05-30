@@ -414,29 +414,12 @@ async function displaySoundList(list, user) {
         });
         div.appendChild(loader);
 
-        // Resolve emote image
-        let emoteData = null;
-        const triggerEntry = triggerImages[item.trigger_word];
-
-        if (typeof triggerEntry === "string") {
-            if (triggerEntry.includes("7tv.app/emotes")) {
-                emoteData = await resolve7TVEmote(triggerEntry);
-            } else if (isImageUrl(triggerEntry)) {
-                emoteData = { image: triggerEntry, link: triggerEntry, name: item.trigger_word };
-            }
-        }
-
-        if (!emoteData) {
-            emoteData = { image: FALLBACK_EMOTE_IMAGE, link: "#", name: item.trigger_word };
-        }
-
-        // Emote image + link
+        // Emote image + link — src filled in asynchronously below
         const emoteAnchor = document.createElement("a");
-        emoteAnchor.href = emoteData.link;
+        emoteAnchor.href = "#";
         emoteAnchor.target = "_blank";
         const emoteImg = document.createElement("img");
-        emoteImg.src = emoteData.image;
-        emoteImg.alt = emoteData.name;
+        emoteImg.alt = item.trigger_word;
         emoteAnchor.appendChild(emoteImg);
         div.appendChild(emoteAnchor);
 
@@ -686,6 +669,27 @@ async function displaySoundList(list, user) {
         }
         soundGrid.appendChild(div);
         emoteDivs.push({ div, trigger_word: item.trigger_word.toLowerCase() });
+
+        // Resolve emote image in the background — card is already visible
+        const triggerEntry = triggerImages[item.trigger_word];
+        const capturedGen = myGen;
+        (async () => {
+            let emoteData = null;
+            if (typeof triggerEntry === "string") {
+                if (triggerEntry.includes("7tv.app/emotes")) {
+                    emoteData = await resolve7TVEmote(triggerEntry);
+                } else if (isImageUrl(triggerEntry)) {
+                    emoteData = { image: triggerEntry, link: triggerEntry, name: item.trigger_word };
+                }
+            }
+            if (!emoteData) {
+                emoteData = { image: FALLBACK_EMOTE_IMAGE, link: "#", name: item.trigger_word };
+            }
+            if (_renderGen !== capturedGen) return; // user navigated away — discard
+            emoteImg.src = emoteData.image;
+            emoteAnchor.href = emoteData.link;
+            emoteImg.alt = emoteData.name;
+        })();
     }
 
 }
