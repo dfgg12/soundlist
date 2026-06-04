@@ -98,7 +98,9 @@ async def channel_editor(
         session.exec(
             select(ChannelSound)
             .where(ChannelSound.channel_id == channel.id)
-            .options(selectinload(ChannelSound.sound))  # type: ignore[arg-type]
+            .options(
+                selectinload(ChannelSound.sound)  # type: ignore[arg-type]
+            )
             .order_by(ChannelSound.position, ChannelSound.id)
         ).all()
     )

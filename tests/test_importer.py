@@ -142,7 +142,9 @@ def test_shared_sounds_dedup(tmp_engine):
     with Session(tmp_engine) as s:
         # "LMAO.ogg" appears in many channels - should be one Sound row
         lmao_sounds = s.exec(
-            select(Sound).where(Sound.url.like("%LMAO.ogg"))  # type: ignore[union-attr]
+            select(Sound).where(
+                Sound.url.like("%LMAO.ogg")  # type: ignore[union-attr]
+            )
         ).all()
         assert len(lmao_sounds) == 1
 

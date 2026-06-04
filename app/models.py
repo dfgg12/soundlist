@@ -1,9 +1,14 @@
 """SQLModel ORM models - canonical SQLite schema."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 
 from sqlalchemy import UniqueConstraint
 from sqlmodel import Field, Relationship, SQLModel
+
+
+def _utcnow() -> datetime:
+    """Return the current timezone-aware UTC timestamp."""
+    return datetime.now(UTC)
 
 
 class User(SQLModel, table=True):
@@ -15,7 +20,7 @@ class User(SQLModel, table=True):
     display_name: str
     avatar_url: str = ""
     is_admin: bool = False
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=_utcnow)
 
     owned_channels: list["Channel"] = Relationship(back_populates="owner")
     created_sounds: list["Sound"] = Relationship(back_populates="creator")
@@ -32,7 +37,7 @@ class Channel(SQLModel, table=True):
     )
     avatar_url: str = ""
     is_sub_board: bool = False
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=_utcnow)
 
     owner: User | None = Relationship(back_populates="owned_channels")
     channel_sounds: list["ChannelSound"] = Relationship(
@@ -52,7 +57,7 @@ class Sound(SQLModel, table=True):
     created_by: int | None = Field(
         default=None, foreign_key="user.id", index=True
     )
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=_utcnow)
 
     creator: User | None = Relationship(back_populates="created_sounds")
     clips: list["SoundClip"] = Relationship(back_populates="sound")

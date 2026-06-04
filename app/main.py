@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 
 import uvicorn
 from fastapi import FastAPI
@@ -23,10 +25,22 @@ logging.basicConfig(
 )
 log = logging.getLogger(__name__)
 
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+    """Run startup tasks: create tables and seed admins."""
+    log.info("starting soundlist (env=%s)", settings.app_env)
+    create_db_and_tables()
+    seed_admins()
+    log.info("db tables ready")
+    yield
+
+
 app = FastAPI(
     title="Soundlist",
     docs_url="/api/docs" if not settings.is_production else None,
     redoc_url=None,
+    lifespan=lifespan,
 )
 
 app.include_router(auth_router)
@@ -42,15 +56,6 @@ app.add_middleware(
     https_only=settings.is_production,
     same_site="lax",
 )
-
-
-@app.on_event("startup")
-async def on_startup() -> None:
-    """Run startup tasks."""
-    log.info("starting soundlist (env=%s)", settings.app_env)
-    create_db_and_tables()
-    seed_admins()
-    log.info("db tables ready")
 
 
 @app.get("/healthz", include_in_schema=False)

@@ -43,7 +43,9 @@ def _usage_counts(
         return {}
     rows = session.exec(
         select(ChannelSound.sound_id, func.count(ChannelSound.id))
-        .where(ChannelSound.sound_id.in_(sound_ids))  # type: ignore[attr-defined]
+        .where(
+            ChannelSound.sound_id.in_(sound_ids)  # type: ignore[attr-defined]
+        )
         .group_by(ChannelSound.sound_id)
     ).all()
     return dict(rows)
@@ -53,7 +55,10 @@ def _using_channels(session: Session, sound_id: int) -> list[str]:
     """Return distinct slugs of channels wired to the given sound."""
     rows = session.exec(
         select(Channel.slug)
-        .join(ChannelSound, ChannelSound.channel_id == Channel.id)  # type: ignore[arg-type]
+        .join(
+            ChannelSound,
+            ChannelSound.channel_id == Channel.id,  # type: ignore[arg-type]
+        )
         .where(ChannelSound.sound_id == sound_id)
         .distinct()
         .order_by(Channel.slug)

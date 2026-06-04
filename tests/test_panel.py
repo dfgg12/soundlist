@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlmodel import Session, SQLModel, create_engine
+from sqlmodel import Session, SQLModel, create_engine, select
 
 import app.db as db_module
 import app.panel as panel_module
@@ -375,7 +375,6 @@ def test_delete_sound_removes_trigger(client, session, test_channel):
         follow_redirects=False,
     )
     assert resp.status_code == 303
-    from sqlmodel import select
     gone = session.exec(
         select(ChannelSound).where(ChannelSound.id == cs_id)
     ).first()

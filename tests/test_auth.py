@@ -5,6 +5,7 @@ from __future__ import annotations
 import pytest
 from sqlmodel import Session, SQLModel, create_engine
 
+import app.auth as auth_module
 import app.db as db_module
 from app.auth import (
     _claim_channels,
@@ -24,7 +25,6 @@ def db(tmp_path, monkeypatch):
     SQLModel.metadata.create_all(eng)
     monkeypatch.setattr(db_module, "engine", eng)
     # Patch auth module engine too (imported directly)
-    import app.auth as auth_module
     monkeypatch.setattr(auth_module, "engine", eng)
     return eng
 
