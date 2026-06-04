@@ -17,7 +17,8 @@ from app.auth import current_user, require_channel_access, require_user
 from app.csrf import csrf_token, require_csrf
 from app.db import get_session
 from app.flash import flash, get_flashes
-from app.models import Channel, ChannelSound, Sound, User
+from app.models import Channel, ChannelSound, Sound, SoundClip, User
+from app.serializer import channel_to_dict
 
 log = logging.getLogger(__name__)
 router = APIRouter()
@@ -30,7 +31,7 @@ _ADD_FORM_KEY = "add_form"
 
 
 def _stash_form(request: Request, **fields: str | int) -> None:
-    """Save add-trigger form values in the session for repopulation after redirect."""
+    """Save add-trigger form values in session for redirect repopulation."""
     request.session[_ADD_FORM_KEY] = {k: str(v) for k, v in fields.items()}
 
 
@@ -331,6 +332,77 @@ async def delete_sound(
 # ---------------------------------------------------------------------------
 # Toggle enabled (T3.5)
 # ---------------------------------------------------------------------------
+
+
+# ---------------------------------------------------------------------------
+# Test / audition view (T5.1, T5.2)
+# ---------------------------------------------------------------------------
+
+
+@router.get("/c/{slug}/test", response_class=HTMLResponse)
+async def channel_test(
+    slug: str,
+    request: Request,
+    session: Session = Depends(get_session),
+    user: User = Depends(require_user),
+    channel: Channel = Depends(require_channel_access),
+) -> HTMLResponse:
+    """Render in-browser audio test page with live JSON preview."""
+    channel_sounds = list(
+        session.exec(
+            select(ChannelSound)
+            .where(ChannelSound.channel_id == channel.id)
+            .options(
+                selectinload(ChannelSound.sound)  # type: ignore[arg-type]
+            )
+            .order_by(ChannelSound.position, ChannelSound.id)
+        ).all()
+    )
+    test_items: list[dict] = []
+    for cs in channel_sounds:
+        sound = cs.sound
+        if sound is None:
+            continue
+        effective_vol = (
+            cs.volume if cs.volume is not None else sound.default_volume
+        )
+        item: dict = {
+            "id": cs.id,
+            "trigger_word": cs.trigger_word,
+            "sound_name": sound.name,
+            "volume": effective_vol,
+            "chance": cs.chance,
+            "enabled": cs.enabled,
+            "is_random": sound.is_random,
+        }
+        if sound.is_random:
+            clips = list(
+                session.exec(
+                    select(SoundClip)
+                    .where(SoundClip.sound_id == sound.id)
+                    .order_by(SoundClip.id)
+                ).all()
+            )
+            item["clips"] = [
+                {"url": c.url, "volume": c.volume, "chance": c.chance}
+                for c in clips
+            ]
+        else:
+            item["url"] = sound.url or ""
+        test_items.append(item)
+
+    channel_json = json.dumps(channel_to_dict(channel, session), indent=2)
+    return templates.TemplateResponse(
+        request,
+        "test.html",
+        {
+            "user": user,
+            "channel": channel,
+            "test_items_json": json.dumps(test_items),
+            "channel_json": channel_json,
+            "flashes": get_flashes(request),
+        },
+    )
 
 
 @router.post("/c/{slug}/sound/{cs_id}/toggle")

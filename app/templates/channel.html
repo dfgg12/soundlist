@@ -5,6 +5,7 @@
   {% if channel.avatar_url %}<img src="{{ channel.avatar_url }}" style="width:36px;height:36px;border-radius:50%">{% endif %}
   <h1 style="margin:0">{{ channel.display_name or channel.slug }}</h1>
   <a href="/lists/{{ channel.slug }}.json" target="_blank" style="font-size:12px;color:#7c3aed;margin-left:.5rem">[ JSON ]</a>
+  <a href="/c/{{ channel.slug }}/test" style="font-size:12px;color:#059669;margin-left:.3rem">[ Test ]</a>
 </div>
 
 <h2>Triggers ({{ channel_sounds | length }})</h2>

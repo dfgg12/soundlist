@@ -136,7 +136,9 @@ async def auth_callback(
             "token dict missing access_token - twitch said: %s",
             token.get("message", token),
         )
-        raise HTTPException(status_code=502, detail="No access token from Twitch")
+        raise HTTPException(
+            status_code=502, detail="No access token from Twitch"
+        )
     try:
         twitch_data = await _fetch_twitch_user(access_token)
     except (httpx.HTTPError, ValueError, KeyError) as exc:
