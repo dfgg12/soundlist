@@ -439,6 +439,26 @@ def test_channel_test_page_contains_json(client, session, test_channel):
     assert b'"sounds"' in resp.content
 
 
+def test_validate_trigger_unique(client, session, test_channel):
+    cs = _make_cs(session, test_channel)
+    resp = client.get(
+        "/c/testchan/validate",
+        params={"trigger_word": cs.trigger_word},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["trigger_unique"] is False
+
+
+def test_validate_trigger_free(client, session, test_channel):
+    resp = client.get(
+        "/c/testchan/validate",
+        params={"trigger_word": "!notexist"},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["trigger_unique"] is True
+
+
 # ---------------------------------------------------------------------------
 # Toggle enabled (T3.5)
 # ---------------------------------------------------------------------------

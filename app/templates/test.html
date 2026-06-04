@@ -31,6 +31,20 @@
 </tbody>
 </table>
 
+<h2 style="margin-top:1.25rem">Validate</h2>
+<div class="card" style="display:flex;flex-wrap:wrap;gap:.75rem;align-items:flex-end">
+  <div>
+    <label style="display:block;font-size:12px;margin-bottom:.2rem">Sound URL</label>
+    <input type="url" id="val-url" style="width:320px" placeholder="https://...">
+  </div>
+  <div>
+    <label style="display:block;font-size:12px;margin-bottom:.2rem">Trigger word</label>
+    <input type="text" id="val-trigger" style="width:140px" placeholder="e.g. !bruh">
+  </div>
+  <button class="btn btn-secondary" onclick="runValidate()">Check</button>
+  <span id="val-result" style="font-size:12px"></span>
+</div>
+
 <h2 style="margin-top:1.25rem">
   Channel JSON
   <button onclick="toggleJson()" class="btn btn-secondary"
@@ -142,6 +156,29 @@ function toggleJson() {
     tbody.appendChild(tr);
   });
 })();
+
+async function runValidate() {
+  const url = document.getElementById('val-url').value.trim();
+  const trigger = document.getElementById('val-trigger').value.trim();
+  const el = document.getElementById('val-result');
+  if (!url && !trigger) { el.textContent = 'Enter a URL or trigger word.'; return; }
+  el.textContent = 'Checking...';
+  const params = new URLSearchParams();
+  if (url) params.set('url', url);
+  if (trigger) params.set('trigger_word', trigger);
+  try {
+    const r = await fetch('/c/{{ channel.slug }}/validate?' + params);
+    const d = await r.json();
+    const parts = [];
+    if ('url_ok' in d) parts.push('URL: ' + (d.url_ok ? 'OK (' + d.url_status + ')' : 'FAIL' + (d.url_error ? ' - ' + d.url_error : ' (' + d.url_status + ')')));
+    if ('trigger_unique' in d) parts.push('Trigger: ' + (d.trigger_unique ? 'unique' : 'DUPLICATE'));
+    el.textContent = parts.join(' | ');
+    el.style.color = (d.url_ok === false || d.trigger_unique === false) ? '#dc2626' : '#059669';
+  } catch(e) {
+    el.textContent = 'Error: ' + e.message;
+    el.style.color = '#dc2626';
+  }
+}
 
 function esc(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');

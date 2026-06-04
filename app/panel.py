@@ -6,8 +6,9 @@ import json
 import logging
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, Form, HTTPException, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+import httpx
+from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import func
 from sqlalchemy.orm import selectinload
@@ -403,6 +404,41 @@ async def channel_test(
             "flashes": get_flashes(request),
         },
     )
+
+
+@router.get("/c/{slug}/validate", response_class=JSONResponse)
+async def validate_trigger(
+    slug: str,
+    session: Session = Depends(get_session),
+    user: User = Depends(require_user),
+    channel: Channel = Depends(require_channel_access),
+    url: str = Query(default=""),
+    trigger_word: str = Query(default=""),
+    exclude_id: int = Query(default=0),
+) -> JSONResponse:
+    """Check URL reachability and trigger-word uniqueness for a channel."""
+    result: dict = {}
+    if url:
+        try:
+            async with httpx.AsyncClient(
+                timeout=5, follow_redirects=True
+            ) as client:
+                r = await client.head(url)
+                result["url_ok"] = r.status_code < 400
+                result["url_status"] = r.status_code
+        except httpx.RequestError as exc:
+            result["url_ok"] = False
+            result["url_error"] = str(exc)
+    if trigger_word:
+        q = select(ChannelSound).where(
+            ChannelSound.channel_id == channel.id,
+            ChannelSound.trigger_word == trigger_word.strip(),
+        )
+        if exclude_id:
+            q = q.where(ChannelSound.id != exclude_id)
+        existing = session.exec(q).first()
+        result["trigger_unique"] = existing is None
+    return JSONResponse(result)
 
 
 @router.post("/c/{slug}/sound/{cs_id}/toggle")
