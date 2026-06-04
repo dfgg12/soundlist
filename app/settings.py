@@ -27,6 +27,8 @@ class Settings(BaseSettings):
 
     app_env: str = "development"
 
+    lists_dir: str = "lists"
+
     @property
     def is_production(self) -> bool:
         """Return True when running in production mode."""

@@ -10,6 +10,7 @@ from fastapi.responses import JSONResponse
 from starlette.middleware.sessions import SessionMiddleware
 
 from app.db import create_db_and_tables
+from app.lists import router as lists_router
 from app.settings import settings
 
 logging.basicConfig(
@@ -23,6 +24,8 @@ app = FastAPI(
     docs_url="/api/docs" if not settings.is_production else None,
     redoc_url=None,
 )
+
+app.include_router(lists_router)
 
 app.add_middleware(
     SessionMiddleware,
@@ -49,7 +52,7 @@ async def healthcheck() -> JSONResponse:
 
 
 def main() -> None:
-    """Start uvicorn; entry point for `uv run soundlist` and `python -m app`."""
+    """Start uvicorn; entry point for uv run soundlist and python -m app."""
     uvicorn.run(
         "app.main:app",
         host="0.0.0.0",

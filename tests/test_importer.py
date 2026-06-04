@@ -2,19 +2,17 @@
 
 from __future__ import annotations
 
-import json
 import sys
 from pathlib import Path
 
 import pytest
-from sqlmodel import Session, create_engine, select
+from sqlmodel import Session, select
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 # pylint: disable=wrong-import-position
 from app.models import Channel, ChannelSound, Sound, SoundClip
 from scripts.import_json import (
-    _clips_to_key,
     _equal_chance,
     _simple_urls_to_key,
     _unique_name,
@@ -86,24 +84,6 @@ def test_simple_vs_weighted_keys_differ():
 # Integration smoke test: import real lists into in-memory SQLite
 # -------------------------------------------------------------------
 
-
-@pytest.fixture()
-def tmp_engine(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
-    """Create an isolated in-memory engine for the importer."""
-    from sqlmodel import SQLModel
-
-    db_url = f"sqlite:///{tmp_path / 'test.db'}"
-    eng = create_engine(db_url, connect_args={"check_same_thread": False})
-    SQLModel.metadata.create_all(eng)
-
-    import app.db as db_module
-
-    monkeypatch.setattr(db_module, "engine", eng)
-
-    import scripts.import_json as importer_module
-
-    monkeypatch.setattr(importer_module, "engine", eng)
-    return eng
 
 
 LISTS_DIR = Path(__file__).parent.parent / "lists"
@@ -212,7 +192,7 @@ def test_sub_board_flag(tmp_engine):
     reason="lists/ directory not present",
 )
 def test_weighted_clips_preserved(tmp_engine):
-    """ssoulDoinDaCatJiggleThing weighted clips are stored with correct data."""
+    """ssoulDoinDaCatJiggleThing clips are stored with correct data."""
     run_import(LISTS_DIR)
 
     with Session(tmp_engine) as s:
