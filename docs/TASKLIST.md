@@ -3,7 +3,7 @@
 Ordered, each task is one commit-sized unit. Test before moving on.
 Maps to milestones M1-M6 in PLAN.md.
 
-Status: M1-M4 done (94 tests passing, ruff clean). Next up: M5.
+Status: M1-M5 done, M6 T6.1-T6.3/T6.5 done (98 tests, ruff+pylint clean). Next: T6.4/T6.6 (README, deploy notes).
 
 ## M1 - Skeleton, DB, importer (JSON parity)
 
@@ -55,19 +55,19 @@ Status: M1-M4 done (94 tests passing, ruff clean). Next up: M5.
 
 ## M5 - Testing / setup view
 
-- [ ] T5.1 `/c/<slug>/test`: in-browser player (vanilla JS, reuse public
+- [x] T5.1 `/c/<slug>/test`: in-browser player (vanilla JS, reuse public
       board audio approach) to audition each trigger.
-- [ ] T5.2 Live preview of generated channel JSON on the same page.
-- [ ] T5.3 (SHOULD) URL reachability + trigger-word validation helper.
+- [x] T5.2 Live preview of generated channel JSON on the same page.
+- [x] T5.3 (SHOULD) URL reachability + trigger-word validation helper.
 
 ## M6 - Admin, polish, deploy
 
-- [ ] T6.1 Admin `/admin`: create channel, assign/reassign owner.
-- [ ] T6.2 (SHOULD) Grant/revoke admin flag.
-- [ ] T6.3 Point public board `app.js` base path at the app's `/lists/*`;
+- [x] T6.1 Admin `/admin`: create channel, assign/reassign owner.
+- [x] T6.2 (SHOULD) Grant/revoke admin flag.
+- [x] T6.3 Point public board `app.js` base path at the app's `/lists/*`;
       verify board works end-to-end unchanged otherwise.
 - [ ] T6.4 README: setup, env vars, `uv run`, import, deploy notes.
-- [ ] T6.5 Lint/type pass: ruff + pylint clean, full type hints.
+- [x] T6.5 Lint/type pass: ruff + pylint clean, full type hints.
 - [ ] T6.6 Deploy notes: uvicorn behind reverse proxy, persistent SQLite
       volume, env secrets.
 
