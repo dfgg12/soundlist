@@ -5,10 +5,12 @@ from __future__ import annotations
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 import uvicorn
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
 from app.admin import router as admin_router
@@ -49,6 +51,11 @@ app.include_router(admin_router)
 app.include_router(lists_router)
 app.include_router(panel_router)
 app.include_router(library_router)
+
+# Serve public board static files (app.js, styles.css, index.html, etc.)
+# from the project root. API routes registered above take precedence.
+_ROOT = Path(__file__).parent.parent
+app.mount("/", StaticFiles(directory=str(_ROOT), html=False), name="static")
 
 app.add_middleware(
     SessionMiddleware,
