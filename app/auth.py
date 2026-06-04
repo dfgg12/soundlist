@@ -48,6 +48,10 @@ async def _fetch_twitch_user(access_token: str) -> dict:
                 "Client-Id": settings.twitch_client_id,
             },
         )
+    if resp.status_code != 200:
+        log.error(
+            "twitch helix/users returned %s: %s", resp.status_code, resp.text
+        )
     resp.raise_for_status()
     data = resp.json().get("data", [])
     if not data:
@@ -106,8 +110,12 @@ async def auth_callback(
     except OAuthError as exc:
         log.warning("oauth error: %s", exc)
         raise HTTPException(status_code=400, detail="OAuth failed") from exc
+    access_token = token.get("access_token")
+    if not access_token:
+        log.error("token dict missing access_token: %s", list(token.keys()))
+        raise HTTPException(status_code=502, detail="No access token from Twitch")
     try:
-        twitch_data = await _fetch_twitch_user(token["access_token"])
+        twitch_data = await _fetch_twitch_user(access_token)
     except (httpx.HTTPError, ValueError, KeyError) as exc:
         log.error("twitch user fetch failed: %s", exc)
         raise HTTPException(

@@ -7,6 +7,8 @@ import secrets
 from fastapi import HTTPException
 from starlette.requests import Request
 
+from app.settings import settings
+
 
 def csrf_token(request: Request) -> str:
     """Return session CSRF token, creating it if absent."""
@@ -19,6 +21,8 @@ def csrf_token(request: Request) -> str:
 
 def require_csrf(request: Request, token: str) -> None:
     """Raise 403 if submitted CSRF token does not match the session."""
+    if not settings.csrf_enabled:
+        return
     session_token = request.session.get("csrf_token")
     if not session_token or not secrets.compare_digest(token, session_token):
         raise HTTPException(status_code=403, detail="CSRF check failed")

@@ -29,6 +29,8 @@ class Settings(BaseSettings):
 
     lists_dir: str = "lists"
 
+    csrf_enabled: bool = True
+
     @property
     def is_production(self) -> bool:
         """Return True when running in production mode."""
