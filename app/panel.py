@@ -222,6 +222,31 @@ async def channel_editor(
             sound_clips.setdefault(clip.sound_id, []).append(
                 {"url": clip.url, "volume": clip.volume, "chance": clip.chance}
             )
+    # Build preview data keyed by ChannelSound.id (consumed by JS, safe in script block)
+    preview_items: dict[int, dict] = {}
+    for cs in channel_sounds:
+        if cs.sound is None:
+            continue
+        effective_vol = (
+            cs.volume if cs.volume is not None else cs.sound.default_volume
+        )
+        if cs.sound.is_random:
+            clips = sound_clips.get(cs.sound_id, [])
+            if not clips:
+                continue
+            preview_items[cs.id] = {
+                "trigger_word": cs.trigger_word,
+                "vol": effective_vol,
+                "is_random": True,
+                "clips": clips,
+            }
+        elif cs.sound.url:
+            preview_items[cs.id] = {
+                "trigger_word": cs.trigger_word,
+                "vol": effective_vol,
+                "is_random": False,
+                "url": cs.sound.url,
+            }
     trigger_hints = sorted(set(
         session.exec(
             select(ChannelSound.trigger_word)
@@ -240,6 +265,7 @@ async def channel_editor(
             "sounds": sounds,
             "sounds_json": sounds_json,
             "sound_clips": sound_clips,
+            "preview_items_json": json.dumps(preview_items),
             "channel_json": channel_json,
             "trigger_hints": trigger_hints,
             "add_form": _pop_form(request),

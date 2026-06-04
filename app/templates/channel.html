@@ -59,16 +59,11 @@
            form="edit-{{ cs.id }}">
   </td>
   <td style="white-space:nowrap">
-    {% if cs.sound and not cs.sound.is_random and cs.sound.url %}
+    {% if cs.id in preview_items %}
     <button type="button" class="btn btn-secondary play-btn"
             style="padding:.2rem .55rem;font-size:12px"
-            onclick="playUrl({{ cs.sound.url | tojson }}, {{ cs.volume if cs.volume is not none else cs.sound.default_volume }}, this, {{ cs.trigger_word | tojson }})"
-            title="Preview sound">&#9654;</button>
-    {% elif cs.sound and cs.sound.is_random and sound_clips.get(cs.sound_id) %}
-    <button type="button" class="btn btn-secondary play-btn"
-            style="padding:.2rem .55rem;font-size:12px"
-            onclick="playRandom({{ sound_clips[cs.sound_id] | tojson }}, {{ cs.volume if cs.volume is not none else cs.sound.default_volume }}, this, {{ cs.trigger_word | tojson }})"
-            title="Preview random clip">&#9654;</button>
+            onclick="previewItem({{ cs.id }}, this)"
+            title="Preview">&#9654;</button>
     {% endif %}
     <button type="submit" form="edit-{{ cs.id }}" class="btn btn-primary btn-sm"
             style="padding:.2rem .55rem;font-size:12px">Save</button>
@@ -246,6 +241,18 @@ function playRandom(clips, vol, btn, label) {
   }
   var clipVol = typeof picked.vol === 'number' ? picked.vol : vol;
   _doPlay(picked.url, clipVol, btn || null, label || '');
+}
+
+const PREVIEW_ITEMS = {{ preview_items_json | safe }};
+
+function previewItem(id, btn) {
+  var item = PREVIEW_ITEMS[id];
+  if (!item) return;
+  if (item.is_random) {
+    playRandom(item.clips, item.vol, btn, item.trigger_word);
+  } else {
+    playUrl(item.url, item.vol, btn, item.trigger_word);
+  }
 }
 
 const SOUNDS = {{ sounds_json | safe }};
