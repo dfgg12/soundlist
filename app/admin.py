@@ -15,7 +15,7 @@ from app.auth import require_user
 from app.csrf import csrf_token, require_csrf
 from app.db import get_session
 from app.flash import flash, get_flashes
-from app.models import Channel, User
+from app.models import Channel, ChannelSound, User
 from app.settings import settings
 
 log = logging.getLogger(__name__)
@@ -110,6 +110,33 @@ async def create_channel(
     session.commit()
     log.info("admin %s created channel %s", admin.login, slug)
     flash(request, f"Channel '{slug}' created.", "success")
+    return RedirectResponse("/admin", status_code=303)
+
+
+@router.post("/channel/{slug}/delete")
+async def delete_channel(
+    slug: str,
+    request: Request,
+    session: Session = Depends(get_session),
+    admin: User = Depends(_require_admin),
+    csrf: str = Form(...),
+) -> RedirectResponse:
+    """Delete a channel and all its triggers."""
+    require_csrf(request, csrf)
+    channel = session.exec(
+        select(Channel).where(Channel.slug == slug)
+    ).first()
+    if not channel:
+        raise HTTPException(status_code=404, detail="Channel not found")
+    triggers = session.exec(
+        select(ChannelSound).where(ChannelSound.channel_id == channel.id)
+    ).all()
+    for cs in triggers:
+        session.delete(cs)
+    session.delete(channel)
+    session.commit()
+    log.info("admin %s deleted channel %s", admin.login, slug)
+    flash(request, f"Channel '{slug}' deleted.", "success")
     return RedirectResponse("/admin", status_code=303)
 
 

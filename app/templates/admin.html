@@ -41,6 +41,7 @@
         <th>Display name</th>
         <th>Owner</th>
         <th>Assign owner</th>
+        <th></th>
       </tr>
     </thead>
     <tbody>
@@ -54,6 +55,13 @@
             <input type="hidden" name="csrf" value="{{ csrf }}">
             <input type="text" name="owner_login" placeholder="login or blank to unassign" style="width:200px">
             <button type="submit" class="btn btn-secondary" style="font-size:12px;padding:.2rem .5rem">Set</button>
+          </form>
+        </td>
+        <td>
+          <form method="post" action="/admin/channel/{{ ch.slug }}/delete"
+                onsubmit="return confirm('Delete channel \'{{ ch.slug }}\' and all its triggers?')">
+            <input type="hidden" name="csrf" value="{{ csrf }}">
+            <button type="submit" class="btn btn-danger" style="font-size:12px;padding:.2rem .5rem">Delete</button>
           </form>
         </td>
       </tr>
