@@ -94,27 +94,17 @@
         </select>
       </div>
 
-      <div id="new_sound_fields" style="display:flex;gap:.5rem;flex-wrap:wrap">
-        <div>
-          <label style="display:block;font-size:12px;margin-bottom:.2rem">Sound name</label>
-          <input type="text" name="sound_name" style="width:140px"
-                 placeholder="optional, defaults to trigger">
-        </div>
-        <div>
-          <label style="display:block;font-size:12px;margin-bottom:.2rem">URL *</label>
-          <input type="url" name="sound_url" style="width:230px"
-                 placeholder="https://...">
-        </div>
+      <div>
+        <label id="sound_name_label" style="display:block;font-size:12px;margin-bottom:.2rem">Sound name</label>
+        <input type="text" name="sound_name" id="sound_name" style="width:200px"
+               placeholder="optional, defaults to trigger" list="sound-hints"
+               oninput="onSoundNameInput(this.value)">
       </div>
 
-      <div id="existing_sound_field" style="display:none">
-        <label style="display:block;font-size:12px;margin-bottom:.2rem">Sound</label>
-        <select name="sound_id" style="width:220px">
-          <option value="">-- select --</option>
-          {% for s in sounds %}
-          <option value="{{ s.id }}">{{ s.name }}</option>
-          {% endfor %}
-        </select>
+      <div id="sound_url_field">
+        <label style="display:block;font-size:12px;margin-bottom:.2rem">URL *</label>
+        <input type="url" name="sound_url" id="sound_url" style="width:230px"
+               placeholder="https://...">
       </div>
 
       <div>
@@ -144,13 +134,34 @@
 <datalist id="trigger-hints">
   {% for word in trigger_hints %}<option value="{{ word }}">{% endfor %}
 </datalist>
+<datalist id="sound-hints">
+  {% for s in sounds %}<option value="{{ s.name }}">{% endfor %}
+</datalist>
 
 <script>
+const SOUNDS = {{ sounds_json | safe }};
+
 function toggleSoundMode(mode) {
-  document.getElementById('new_sound_fields').style.display =
-    mode === 'new' ? 'flex' : 'none';
-  document.getElementById('existing_sound_field').style.display =
-    mode === 'existing' ? '' : 'none';
+  const isNew = mode === 'new';
+  document.getElementById('sound_url_field').style.display = isNew ? '' : 'none';
+  document.getElementById('sound_url').required = isNew;
+  document.getElementById('sound_name_label').textContent =
+    isNew ? 'Sound name' : 'Sound name *';
+  document.getElementById('sound_name').placeholder =
+    isNew ? 'optional, defaults to trigger' : 'type to search library';
+  if (!isNew) onSoundNameInput(document.getElementById('sound_name').value);
+}
+
+function onSoundNameInput(name) {
+  if (document.getElementById('sound_mode').value !== 'existing') return;
+  const s = SOUNDS[name];
+  if (!s) return;
+  const tw = document.querySelector('[name=trigger_word]');
+  const vol = document.querySelector('[name=volume]');
+  const cd = document.querySelector('[name=trigger_cooldown]');
+  if (tw && !tw.value) tw.value = name;
+  if (vol && !vol.value) vol.value = s.volume !== 0.5 ? s.volume : '';
+  if (cd && !cd.value) cd.value = 0;
 }
 </script>
 {% endblock %}

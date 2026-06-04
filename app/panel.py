@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 from pathlib import Path
 
@@ -108,6 +109,9 @@ async def channel_editor(
         ).all()
     )
     sounds = list(session.exec(select(Sound).order_by(Sound.name)).all())
+    sounds_json = json.dumps(
+        {s.name: {"volume": s.default_volume} for s in sounds}
+    )
     trigger_hints = sorted(set(
         session.exec(
             select(ChannelSound.trigger_word)
@@ -123,6 +127,7 @@ async def channel_editor(
             "channel": channel,
             "channel_sounds": channel_sounds,
             "sounds": sounds,
+            "sounds_json": sounds_json,
             "trigger_hints": trigger_hints,
             "csrf": csrf_token(request),
             "flashes": get_flashes(request),
@@ -144,7 +149,6 @@ async def add_sound(
     channel: Channel = Depends(require_channel_access),
     trigger_word: str = Form(...),
     sound_mode: str = Form("new"),
-    sound_id: int | None = Form(None),
     sound_name: str = Form(""),
     sound_url: str = Form(""),
     volume: str = Form(""),
@@ -169,12 +173,15 @@ async def add_sound(
         return RedirectResponse(f"/c/{slug}", status_code=303)
     sound: Sound | None = None
     if sound_mode == "existing":
-        if not sound_id:
-            flash(request, "Select a sound from the library.", "error")
+        sound_name = sound_name.strip()
+        if not sound_name:
+            flash(request, "Enter a sound name.", "error")
             return RedirectResponse(f"/c/{slug}", status_code=303)
-        sound = session.get(Sound, sound_id)
+        sound = session.exec(
+            select(Sound).where(Sound.name == sound_name)
+        ).first()
         if not sound:
-            flash(request, "Sound not found.", "error")
+            flash(request, f"Sound '{sound_name}' not found in library.", "error")
             return RedirectResponse(f"/c/{slug}", status_code=303)
     else:
         sound_name = sound_name.strip() or trigger_word
