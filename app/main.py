@@ -8,6 +8,7 @@ from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from starlette.middleware.sessions import SessionMiddleware
 
+from app.db import create_db_and_tables
 from app.settings import settings
 
 logging.basicConfig(
@@ -36,6 +37,8 @@ app.add_middleware(
 async def on_startup() -> None:
     """Run startup tasks."""
     log.info("starting soundlist (env=%s)", settings.app_env)
+    create_db_and_tables()
+    log.info("db tables ready")
 
 
 @app.get("/healthz", include_in_schema=False)
