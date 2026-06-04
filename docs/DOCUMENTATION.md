@@ -116,16 +116,12 @@ Complete documentation for the Soundlist management panel. Start here to find wh
 - Testing architecture
 - Deployment architecture
 
-**[PLAN.md](PLAN.md)** - Project planning and roadmap
+**[PLAN.md](PLAN.md)** - Original project plan (historical reference)
 
-- Problem statement
-- Scope (in-scope and out-of-scope)
-- Key design decisions
-- Data model
-- JSON compatibility layer
-- Views and routes
-- Implementation milestones
-- Risks and assumptions
+- Problem statement and scope decisions
+- Key design decisions and rationale
+- Data model and JSON compatibility contract
+- Implementation milestones (all complete as of M6)
 
 **[REQUIREMENTS.md](REQUIREMENTS.md)** - Functional and non-functional requirements
 
@@ -401,4 +397,4 @@ These documents should stay in sync with the code:
 - When changing database schema, update ARCHITECTURE.md and INTEGRATION.md
 - When completing a task, update TASKLIST.md
 
-Last updated: 2026-06-04
+Last updated: 2026-06-04. All M1-M6 milestones complete.
