@@ -31,6 +31,9 @@ class Settings(BaseSettings):
 
     csrf_enabled: bool = True
 
+    # Allow any logged-in user to self-register a channel matching their login
+    allow_self_register: bool = True
+
     @property
     def is_production(self) -> bool:
         """Return True when running in production mode."""

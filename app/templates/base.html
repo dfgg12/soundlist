@@ -56,7 +56,7 @@ input[type=text]:focus, input[type=number]:focus, input[type=url]:focus, select:
     {% if user %}
       <a href="/library">Library</a>
       {% if user.avatar_url %}<img src="{{ user.avatar_url }}" class="nav-avatar" alt="">{% endif %}
-      <a href="/#user-card">{{ user.display_name }}</a>
+      <a href="/c/{{ user.login }}">{{ user.display_name }}</a>
       {% if user.is_admin %}<a href="/admin">Admin</a>{% endif %}
       <a href="/logout">Logout</a>
     {% else %}

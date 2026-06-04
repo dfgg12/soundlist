@@ -20,6 +20,14 @@
     {% endfor %}
   </ul>
 </div>
+{% elif can_self_register %}
+<div class="card" id="user-card">
+  <p style="margin-bottom:.75rem">No channel linked to <strong>{{ user.login }}</strong> yet.</p>
+  <form method="post" action="/self-register">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <button type="submit" class="btn btn-primary">Create channel for {{ user.login }}</button>
+  </form>
+</div>
 {% else %}
 <div class="card" id="user-card">
   <p>No channels linked to your Twitch account (<strong>{{ user.login }}</strong>).</p>

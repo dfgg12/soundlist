@@ -20,6 +20,7 @@ from app.db import get_session
 from app.flash import flash, get_flashes
 from app.models import Channel, ChannelSound, Sound, SoundClip, User
 from app.serializer import channel_to_dict
+from app.settings import settings
 
 log = logging.getLogger(__name__)
 router = APIRouter()
@@ -110,6 +111,7 @@ async def dashboard(
 ) -> HTMLResponse:
     """Render dashboard with channels the user may manage."""
     channels: list[Channel] = []
+    can_self_register = False
     if user:
         if user.is_admin:
             channels = list(
@@ -125,15 +127,54 @@ async def dashboard(
                     .order_by(func.lower(Channel.slug))
                 ).all()
             )
+            if settings.allow_self_register and not channels:
+                slug_taken = session.exec(
+                    select(Channel).where(Channel.slug == user.login)
+                ).first()
+                can_self_register = slug_taken is None
     return templates.TemplateResponse(
         request,
         "dashboard.html",
         {
             "user": user,
             "channels": channels,
+            "can_self_register": can_self_register,
+            "csrf": csrf_token(request),
             "flashes": get_flashes(request),
         },
     )
+
+
+@router.post("/self-register")
+async def self_register(
+    request: Request,
+    session: Session = Depends(get_session),
+    user: User = Depends(require_user),
+    csrf: str = Form(...),
+) -> RedirectResponse:
+    """Create a channel for the current user using their login as slug."""
+    require_csrf(request, csrf)
+    if not settings.allow_self_register:
+        raise HTTPException(
+            status_code=403, detail="Self-registration disabled"
+        )
+    existing = session.exec(
+        select(Channel).where(Channel.slug == user.login)
+    ).first()
+    if existing:
+        flash(request, f"Channel '{user.login}' already exists.", "error")
+        return RedirectResponse("/", status_code=303)
+    channel = Channel(
+        slug=user.login,
+        display_name=user.display_name,
+        owner_id=user.id,
+        avatar_url=user.avatar_url,
+    )
+    session.add(channel)
+    session.commit()
+    log.info("self-registered channel %s for user %s", user.login, user.login)
+    flash(request, f"Channel '{user.login}' created.", "success")
+    return RedirectResponse("/", status_code=303)
 
 
 # ---------------------------------------------------------------------------
