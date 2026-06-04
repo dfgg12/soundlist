@@ -108,6 +108,13 @@ async def channel_editor(
         ).all()
     )
     sounds = list(session.exec(select(Sound).order_by(Sound.name)).all())
+    trigger_hints = sorted(set(
+        session.exec(
+            select(ChannelSound.trigger_word)
+            .where(ChannelSound.channel_id != channel.id)
+            .distinct()
+        ).all()
+    ))
     return templates.TemplateResponse(
         request,
         "channel.html",
@@ -116,6 +123,7 @@ async def channel_editor(
             "channel": channel,
             "channel_sounds": channel_sounds,
             "sounds": sounds,
+            "trigger_hints": trigger_hints,
             "csrf": csrf_token(request),
             "flashes": get_flashes(request),
         },

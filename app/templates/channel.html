@@ -26,7 +26,7 @@
 <tr>
   <td>
     <input type="text" name="trigger_word" value="{{ cs.trigger_word }}"
-           form="edit-{{ cs.id }}" style="width:130px">
+           form="edit-{{ cs.id }}" style="width:130px" list="trigger-hints">
   </td>
   <td style="color:#555;font-size:12px">{{ cs.sound.name if cs.sound else '?' }}</td>
   <td>
@@ -82,7 +82,7 @@
       <div>
         <label style="display:block;font-size:12px;margin-bottom:.2rem">Trigger word *</label>
         <input type="text" name="trigger_word" required style="width:140px"
-               placeholder="e.g. !bruh">
+               placeholder="e.g. !bruh" list="trigger-hints">
       </div>
 
       <div>
@@ -140,6 +140,10 @@
     </div>
   </form>
 </div>
+
+<datalist id="trigger-hints">
+  {% for word in trigger_hints %}<option value="{{ word }}">{% endfor %}
+</datalist>
 
 <script>
 function toggleSoundMode(mode) {
