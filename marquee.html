@@ -13,21 +13,6 @@
     height: 100vh;
   }
 
-  /* Clock widget - top left, matches user's original style */
-  #clock {
-    position: fixed;
-    top: 12px;
-    left: 12px;
-    display: inline-block;
-    font-family: monospace;
-    font-size: 30px;
-    text-align: right;
-    color: lightgray;
-    border-radius: 10px;
-    padding: 10px;
-    background-color: rgba(0, 0, 0, 0.75);
-  }
-
   /* Marquee bar - pinned to bottom */
   .bar {
     position: fixed;
@@ -40,6 +25,19 @@
     background: rgba(0, 0, 0, 0.78);
     border-top: 2px solid #ff4400;
     overflow: hidden;
+  }
+
+  #clock {
+    flex-shrink: 0;
+    padding: 0 14px;
+    font-family: monospace;
+    font-size: 16px;
+    color: lightgray;
+    border-right: 2px solid #ff4400;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    white-space: nowrap;
   }
 
   .label {
@@ -111,9 +109,8 @@
 </head>
 <body>
 
-<div id="clock">2026/06/04 00:00:00</div>
-
 <div class="bar">
+  <div id="clock">2026/06/04 00:00:00</div>
   <div class="label">slopmaxxing</div>
   <div class="scroll-wrap">
     <div class="scroll-inner" id="ticker"></div>
