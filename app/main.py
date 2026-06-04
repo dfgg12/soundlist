@@ -9,6 +9,8 @@ from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from starlette.middleware.sessions import SessionMiddleware
 
+from app.auth import router as auth_router
+from app.auth import seed_admins
 from app.db import create_db_and_tables
 from app.lists import router as lists_router
 from app.settings import settings
@@ -25,6 +27,7 @@ app = FastAPI(
     redoc_url=None,
 )
 
+app.include_router(auth_router)
 app.include_router(lists_router)
 
 app.add_middleware(
@@ -42,6 +45,7 @@ async def on_startup() -> None:
     """Run startup tasks."""
     log.info("starting soundlist (env=%s)", settings.app_env)
     create_db_and_tables()
+    seed_admins()
     log.info("db tables ready")
 
 
