@@ -3,45 +3,47 @@
 Ordered, each task is one commit-sized unit. Test before moving on.
 Maps to milestones M1-M6 in PLAN.md.
 
+Status: M1-M4 done (94 tests passing, ruff clean). Next up: M5.
+
 ## M1 - Skeleton, DB, importer (JSON parity)
 
-- [ ] T1.1 Init Python project: `pyproject.toml`, `uv`, deps (fastapi,
+- [x] T1.1 Init Python project: `pyproject.toml`, `uv`, deps (fastapi,
       uvicorn, sqlmodel, authlib, httpx, jinja2, itsdangerous,
       python-multipart), ruff + pylint config. ASCII, 79 cols.
-- [ ] T1.2 App skeleton: `app/main.py` FastAPI instance, settings from
+- [x] T1.2 App skeleton: `app/main.py` FastAPI instance, settings from
       env (pydantic-settings), `.env.example`, healthcheck route.
-- [ ] T1.3 Models: User, Channel, Sound, SoundClip, ChannelSound
+- [x] T1.3 Models: User, Channel, Sound, SoundClip, ChannelSound
       (SQLModel) + `create_all` on startup.
-- [ ] T1.4 JSON serializer: DB -> legacy shape (single vs random sound,
+- [x] T1.4 JSON serializer: DB -> legacy shape (single vs random sound,
       string `enabled`, "%"-`chance`). Pure function, unit-tested.
-- [ ] T1.5 Importer script: parse `lists/*.json`, `index.json`,
+- [x] T1.5 Importer script: parse `lists/*.json`, `index.json`,
       `internals/avatars.json`, dedupe identical sound URLs into shared
       Sound rows, populate DB. Idempotent.
-- [ ] T1.6 Read-only endpoints: `/lists/index.json`, `/lists/<slug>.json`,
+- [x] T1.6 Read-only endpoints: `/lists/index.json`, `/lists/<slug>.json`,
       `/lists/internals/avatars.json`, `/lists/internals/IconTriggers2.json`.
-- [ ] T1.7 Parity test: import then export each channel equals original
+- [x] T1.7 Parity test: import then export each channel equals original
       JSON (content-equal, key order ignored). Must pass for all 25.
 
 ## M2 - Auth, sessions, RBAC
 
-- [ ] T2.1 Twitch OAuth via Authlib: `/login`, `/auth/callback`; fetch
+- [x] T2.1 Twitch OAuth via Authlib: `/login`, `/auth/callback`; fetch
       user id/login/display/avatar; upsert User.
-- [ ] T2.2 Sessions: `SessionMiddleware` signed cookie; `/logout`.
-- [ ] T2.3 Admin seeding: env `ADMIN_LOGINS` sets `is_admin` on startup.
-- [ ] T2.4 Auth dependencies: `current_user`, `require_user`,
+- [x] T2.2 Sessions: `SessionMiddleware` signed cookie; `/logout`.
+- [x] T2.3 Admin seeding: env `ADMIN_LOGINS` sets `is_admin` on startup.
+- [x] T2.4 Auth dependencies: `current_user`, `require_user`,
       `require_channel_access(slug)` (admin or owner). Server-side only.
-- [ ] T2.5 Owner matching: link User to Channel by twitch_id on login.
+- [x] T2.5 Owner matching: link User to Channel by login slug on login.
 
 ## M3 - Channel sound editor
 
-- [ ] T3.1 Base layout template + nav + flash messages + CSRF token
+- [x] T3.1 Base layout template + nav + flash messages + CSRF token
       helper.
-- [ ] T3.2 Dashboard `/`: channels current user may manage.
-- [ ] T3.3 Channel editor `/c/<slug>`: table of triggers, all fields.
-- [ ] T3.4 Add trigger `POST /c/<slug>/sound` (link existing or new
+- [x] T3.2 Dashboard `/`: channels current user may manage.
+- [x] T3.3 Channel editor `/c/<slug>`: table of triggers, all fields.
+- [x] T3.4 Add trigger `POST /c/<slug>/sound` (link existing or new
       inline Sound). Validate unique trigger_word per channel.
-- [ ] T3.5 Edit `POST /c/<slug>/sound/<id>`, delete, toggle enabled.
-- [ ] T3.6 CSRF on all forms; friendly validation errors.
+- [x] T3.5 Edit `POST /c/<slug>/sound/<id>`, delete, toggle enabled.
+- [x] T3.6 CSRF on all forms; friendly validation errors.
 
 ## M4 - Shared library and linking
 
@@ -75,6 +77,25 @@ Maps to milestones M1-M6 in PLAN.md.
 - [ ] S2 Admin CRUD for avatars and emote icon triggers.
 - [ ] S3 Reorder triggers via drag (position field already in model).
 - [ ] S4 Alembic migrations once schema stabilizes.
+
+## Tech debt / follow-ups (from M1-M4 code review)
+
+- [ ] D1 Type-checker gate: add pyright (or mypy) to dev deps + CI so the
+      scattered `# type: ignore[...]` on SQLModel columns are verified,
+      not decorative. Then replace column-attr ignores with sqlmodel
+      `col()` where it reads cleaner (`col(ChannelSound.sound_id).in_(...)`).
+- [ ] D2 Starlette `TestClient` emits a deprecation warning (httpx vs
+      httpx2). Pin/upgrade test stack to silence; add `filterwarnings`
+      in pytest config so new deprecations fail loudly.
+- [ ] D3 `created_at` is now tz-aware (`datetime.now(UTC)`). If any future
+      query/sort needs it, declare the column `DateTime(timezone=True)`
+      so SQLite round-trips the offset; currently stored as naive string.
+- [ ] D4 Endpoint handlers exceed pylint `max-args=8` (FastAPI Form/Depends
+      idiom). Either bump the design limit for route modules or fold form
+      fields into a Pydantic model bound via `Depends`. Decide, document.
+- [ ] D5 T6.5 lint pass partly done: ruff clean, 79-col enforced, deprecated
+      `on_event` -> lifespan. Remaining: pylint clean run in the venv (not
+      system Python) and resolve `func.count` false positive.
 
 ## Definition of done per task
 

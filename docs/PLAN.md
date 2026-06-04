@@ -55,7 +55,9 @@ chain is overkill for ~25 streamers.
 Twitch OAuth Authorization Code flow (Authlib). Session in a signed
 cookie (Starlette `SessionMiddleware`). No passwords stored.
 Admins listed by Twitch login in config/env on first run; thereafter a
-DB flag. Login matched to channels by Twitch user id.
+DB flag. On login, unowned channels are claimed by matching the user's
+lowercase `login` to `Channel.slug` (channels carry no `twitch_id`; slugs
+are the original Twitch logins from the imported JSON filenames).
 
 ### 3.4 Stack (version-specific)
 - Python 3.11+, FastAPI (latest 0.1xx), Uvicorn.
@@ -179,14 +181,15 @@ RBAC guard: a dependency that loads the session user and asserts
 
 ## 7. Milestones
 
-M1 Skeleton + DB + importer (read-only JSON parity with today).
-M2 Twitch OAuth + sessions + RBAC.
-M3 Channel sound editor (CRUD).
-M4 Shared library + linking.
-M5 Testing/setup view.
+M1 Skeleton + DB + importer (read-only JSON parity with today).  [done]
+M2 Twitch OAuth + sessions + RBAC.                               [done]
+M3 Channel sound editor (CRUD).                                  [done]
+M4 Shared library + linking.                                     [done]
+M5 Testing/setup view.                                           [next]
 M6 Admin panel + polish + deploy.
 
-See TASKLIST.md for the breakdown.
+See TASKLIST.md for the breakdown and the tech-debt follow-ups (D1-D5)
+surfaced by the M1-M4 review.
 
 ## 8. Risks / assumptions
 
@@ -197,4 +200,6 @@ See TASKLIST.md for the breakdown.
   is a string with "%"). Importer and exporter must round-trip these
   exactly. Covered by a parity test.
 - Risk: Twitch login casing. Store lowercase `login`, keep display name
-  separate; match channels by `twitch_id`, not name.
+  separate; channel claim compares `lower(slug) == login`. A streamer who
+  renames their Twitch login will not auto-claim a slug minted under the
+  old name - admin reassignment (M6/T6.1) covers that case.
