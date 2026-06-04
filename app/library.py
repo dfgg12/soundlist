@@ -118,6 +118,39 @@ def _clips_map(session: Session, sound_ids: list[int]) -> dict[int, list[str]]:
     return result
 
 
+def _user_channels(session: Session, user: User) -> list[Channel]:
+    """Return channels the user may add triggers to (owned or admin)."""
+    if user.is_admin:
+        return list(
+            session.exec(
+                select(Channel).order_by(func.lower(Channel.slug))
+            ).all()
+        )
+    return list(
+        session.exec(
+            select(Channel)
+            .where(Channel.owner_id == user.id)
+            .order_by(func.lower(Channel.slug))
+        ).all()
+    )
+
+
+def _added_sound_ids(
+    session: Session, channel_ids: list[int]
+) -> set[int]:
+    """Return sound IDs already wired to any of the given channels."""
+    if not channel_ids:
+        return set()
+    rows = session.exec(
+        select(ChannelSound.sound_id).where(
+            ChannelSound.channel_id.in_(  # type: ignore[attr-defined]
+                channel_ids
+            )
+        )
+    ).all()
+    return set(rows)
+
+
 @router.get("/library", response_class=HTMLResponse)
 async def library_index(
     request: Request,
@@ -135,6 +168,10 @@ async def library_index(
     counts = _usage_counts(session, [s.id for s in sounds if s.id])
     random_ids = [s.id for s in sounds if s.is_random and s.id]
     clips = _clips_map(session, random_ids)
+    my_channels = _user_channels(session, user)
+    added_ids = _added_sound_ids(
+        session, [c.id for c in my_channels if c.id]
+    )
     return templates.TemplateResponse(
         request,
         "library.html",
@@ -143,6 +180,8 @@ async def library_index(
             "sounds": sounds,
             "counts": counts,
             "clips": clips,
+            "my_channels": my_channels,
+            "added_ids": added_ids,
             "q": term,
             "csrf": csrf_token(request),
             "flashes": get_flashes(request),
@@ -295,4 +334,71 @@ async def delete_asset(
     session.delete(sound)
     session.commit()
     flash(request, f"Deleted asset '{name}'.", "success")
+    return RedirectResponse("/library", status_code=303)
+
+
+# ---------------------------------------------------------------------------
+# Add sound to own channel from library
+# ---------------------------------------------------------------------------
+
+
+@router.post("/library/{sound_id}/add")
+async def add_to_channel(
+    sound_id: int,
+    request: Request,
+    session: Session = Depends(get_session),
+    user: User = Depends(require_user),
+    channel_id: int = Form(...),
+    trigger_word: str = Form(...),
+    csrf: str = Form(...),
+) -> RedirectResponse:
+    """Wire a library sound to one of the user's channels as a trigger."""
+    require_csrf(request, csrf)
+    sound = session.get(Sound, sound_id)
+    if not sound:
+        raise HTTPException(status_code=404, detail="Asset not found")
+    channel = session.get(Channel, channel_id)
+    if not channel:
+        raise HTTPException(status_code=404, detail="Channel not found")
+    if not user.is_admin and channel.owner_id != user.id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    trigger_word = trigger_word.strip()
+    if not trigger_word:
+        flash(request, "Trigger word is required.", "error")
+        return RedirectResponse("/library", status_code=303)
+    dup = session.exec(
+        select(ChannelSound).where(
+            ChannelSound.channel_id == channel_id,
+            ChannelSound.trigger_word == trigger_word,
+        )
+    ).first()
+    if dup:
+        flash(
+            request,
+            f"Trigger '{trigger_word}' already exists in {channel.slug}.",
+            "error",
+        )
+        return RedirectResponse("/library", status_code=303)
+    rows = session.exec(
+        select(ChannelSound).where(
+            ChannelSound.channel_id == channel_id
+        )
+    ).all()
+    cs = ChannelSound(
+        channel_id=channel_id,
+        sound_id=sound_id,
+        trigger_word=trigger_word,
+        volume=None,
+        chance="100%",
+        trigger_cooldown=0,
+        enabled=True,
+        position=len(rows),
+    )
+    session.add(cs)
+    session.commit()
+    flash(
+        request,
+        f"Added '{sound.name}' as !{trigger_word} to {channel.slug}.",
+        "success",
+    )
     return RedirectResponse("/library", status_code=303)
