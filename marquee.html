@@ -70,6 +70,7 @@
     display: inline-flex;
     align-items: center;
     white-space: nowrap;
+    animation: marquee 60s linear infinite; /* default until JS measures */
   }
 
   .scroll-inner .slop {
@@ -169,19 +170,24 @@ function buildTicker(commits) {
   var content = slopHtml + commitHtml;
   el.innerHTML = content + content; // duplicate for seamless loop
 
-  // Measure and set animation speed
-  requestAnimationFrame(function() {
+  // Give browser one frame to lay out injected HTML before measuring
+  setTimeout(function() {
     var half = el.scrollWidth / 2;
+    if (half <= 0) return; // still not laid out, CSS default keeps it running
     var speed = 90; // px/s
     var dur = (half / speed).toFixed(2) + 's';
     el.style.animation = 'marquee ' + dur + ' linear infinite';
-  });
+  }, 100);
 }
 
-// Live fetch from GitHub, fall back to hardcoded if blocked/offline
+// Render immediately so ticker is visible even if network is slow/blocked
+buildTicker(fallbackCommits);
+
+// Try live fetch; rebuild if it works
 fetch('https://api.github.com/repos/dfgg12/soundlist/commits?per_page=5')
   .then(function(r) { return r.json(); })
   .then(function(data) {
+    if (!Array.isArray(data)) return; // API returned error object, keep fallback
     var commits = data.map(function(c) {
       return {
         sha:  c.sha.slice(0, 7),
@@ -191,9 +197,7 @@ fetch('https://api.github.com/repos/dfgg12/soundlist/commits?per_page=5')
     });
     buildTicker(commits);
   })
-  .catch(function() {
-    buildTicker(fallbackCommits);
-  });
+  .catch(function() {}); // fallback already rendered, nothing to do
 </script>
 
 </body>
