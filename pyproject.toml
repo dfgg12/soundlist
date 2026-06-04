@@ -49,6 +49,8 @@ known-first-party = ["app"]
 [tool.pylint.main]
 py-version = "3.11"
 jobs = 1
+# sqlmodel/pydantic use dynamic attrs; skip import analysis
+ignored-modules = ["sqlmodel", "pydantic", "pydantic_settings", "authlib"]
 
 [tool.pylint.format]
 max-line-length = 79
@@ -58,10 +60,16 @@ disable = [
     "missing-module-docstring",
     "too-few-public-methods",
     "duplicate-code",
+    # FastAPI Depends() args present for auth side-effects, value unused
+    "unused-argument",
+    # FastAPI Form/Depends DI pattern inherently exceeds positional limit
+    "too-many-positional-arguments",
 ]
 
 [tool.pylint.design]
-max-args = 8
+# FastAPI route handlers use Form + Depends; bump limits to accommodate
+max-args = 15
+max-locals = 20
 max-attributes = 12
 
 [dependency-groups]

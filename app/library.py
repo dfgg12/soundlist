@@ -42,7 +42,7 @@ def _usage_counts(
     if not sound_ids:
         return {}
     rows = session.exec(
-        select(ChannelSound.sound_id, func.count(ChannelSound.id))
+        select(ChannelSound.sound_id, func.count(ChannelSound.id))  # pylint: disable=not-callable
         .where(
             ChannelSound.sound_id.in_(sound_ids)  # type: ignore[attr-defined]
         )

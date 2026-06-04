@@ -52,6 +52,43 @@ def _parse_volume(raw: str) -> float | None:
         return None
 
 
+def _resolve_sound(
+    session: Session,
+    mode: str,
+    name: str,
+    url: str,
+    trigger_word: str,
+    user: User,
+) -> Sound | str:
+    """Return resolved Sound or an error message string."""
+    if mode == "existing":
+        name = name.strip()
+        if not name:
+            return "Enter a sound name."
+        found = session.exec(
+            select(Sound).where(Sound.name == name)
+        ).first()
+        return found if found else f"Sound '{name}' not found in library."
+    name = name.strip() or trigger_word
+    url = url.strip()
+    if not url:
+        return "Sound URL is required for a new sound."
+    found = session.exec(select(Sound).where(Sound.name == name)).first()
+    if found is None:
+        found = Sound(
+            name=name, url=url, is_random=False, created_by=user.id
+        )
+        session.add(found)
+        session.flush()
+        return found
+    if found.url != url:
+        return (
+            f"Sound name '{name}' is already taken. "
+            "Use a different name or select from library."
+        )
+    return found
+
+
 def _next_position(session: Session, channel_id: int) -> int:
     """Return position value for a new ChannelSound (append to end)."""
     rows = session.exec(
@@ -200,38 +237,12 @@ async def add_sound(
     ).first()
     if dup:
         return _err(f"Trigger '{trigger_word}' already exists.")
-    sound: Sound | None = None
-    if sound_mode == "existing":
-        sound_name = sound_name.strip()
-        if not sound_name:
-            return _err("Enter a sound name.")
-        sound = session.exec(
-            select(Sound).where(Sound.name == sound_name)
-        ).first()
-        if not sound:
-            return _err(f"Sound '{sound_name}' not found in library.")
-    else:
-        sound_name = sound_name.strip() or trigger_word
-        sound_url = sound_url.strip()
-        if not sound_url:
-            return _err("Sound URL is required for a new sound.")
-        sound = session.exec(
-            select(Sound).where(Sound.name == sound_name)
-        ).first()
-        if sound is None:
-            sound = Sound(
-                name=sound_name,
-                url=sound_url,
-                is_random=False,
-                created_by=user.id,
-            )
-            session.add(sound)
-            session.flush()
-        elif sound.url != sound_url:
-            return _err(
-                f"Sound name '{sound_name}' is already taken. "
-                "Use a different name or select from library."
-            )
+    result = _resolve_sound(
+        session, sound_mode, sound_name, sound_url, trigger_word, user
+    )
+    if isinstance(result, str):
+        return _err(result)
+    sound = result
     cs = ChannelSound(
         channel_id=channel.id,
         sound_id=sound.id,
