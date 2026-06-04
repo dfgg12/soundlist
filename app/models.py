@@ -1,7 +1,5 @@
 """SQLModel ORM models - canonical SQLite schema."""
 
-from __future__ import annotations
-
 from datetime import datetime
 
 from sqlalchemy import UniqueConstraint
@@ -19,8 +17,8 @@ class User(SQLModel, table=True):
     is_admin: bool = False
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
-    owned_channels: list[Channel] = Relationship(back_populates="owner")
-    created_sounds: list[Sound] = Relationship(back_populates="creator")
+    owned_channels: list["Channel"] = Relationship(back_populates="owner")
+    created_sounds: list["Sound"] = Relationship(back_populates="creator")
 
 
 class Channel(SQLModel, table=True):
@@ -37,7 +35,9 @@ class Channel(SQLModel, table=True):
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
     owner: User | None = Relationship(back_populates="owned_channels")
-    channel_sounds: list[ChannelSound] = Relationship(back_populates="channel")
+    channel_sounds: list["ChannelSound"] = Relationship(
+        back_populates="channel"
+    )
 
 
 class Sound(SQLModel, table=True):
@@ -55,8 +55,10 @@ class Sound(SQLModel, table=True):
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
     creator: User | None = Relationship(back_populates="created_sounds")
-    clips: list[SoundClip] = Relationship(back_populates="sound")
-    channel_sounds: list[ChannelSound] = Relationship(back_populates="sound")
+    clips: list["SoundClip"] = Relationship(back_populates="sound")
+    channel_sounds: list["ChannelSound"] = Relationship(
+        back_populates="sound"
+    )
 
 
 class SoundClip(SQLModel, table=True):

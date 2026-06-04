@@ -53,3 +53,8 @@ disable = [
 [tool.pylint.design]
 max-args = 8
 max-attributes = 12
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
+]
