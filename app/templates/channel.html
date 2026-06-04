@@ -82,15 +82,16 @@
       <div>
         <label style="display:block;font-size:12px;margin-bottom:.2rem">Trigger word *</label>
         <input type="text" name="trigger_word" required style="width:140px"
-               placeholder="e.g. !bruh" list="trigger-hints">
+               placeholder="e.g. !bruh" list="trigger-hints"
+               value="{{ add_form.get('trigger_word', '') }}">
       </div>
 
       <div>
         <label style="display:block;font-size:12px;margin-bottom:.2rem">Sound source</label>
         <select name="sound_mode" id="sound_mode"
                 onchange="toggleSoundMode(this.value)" style="width:140px">
-          <option value="new">New sound</option>
-          <option value="existing">Existing sound</option>
+          <option value="new" {% if add_form.get('sound_mode','new')=='new' %}selected{% endif %}>New sound</option>
+          <option value="existing" {% if add_form.get('sound_mode')=='existing' %}selected{% endif %}>Existing sound</option>
         </select>
       </div>
 
@@ -98,29 +99,32 @@
         <label id="sound_name_label" style="display:block;font-size:12px;margin-bottom:.2rem">Sound name</label>
         <input type="text" name="sound_name" id="sound_name" style="width:200px"
                placeholder="optional, defaults to trigger" list="sound-hints"
-               oninput="onSoundNameInput(this.value)">
+               oninput="onSoundNameInput(this.value)"
+               value="{{ add_form.get('sound_name', '') }}">
       </div>
 
       <div id="sound_url_field">
         <label style="display:block;font-size:12px;margin-bottom:.2rem">URL *</label>
         <input type="url" name="sound_url" id="sound_url" style="width:230px"
-               placeholder="https://...">
+               placeholder="https://..."
+               value="{{ add_form.get('sound_url', '') }}">
       </div>
 
       <div>
         <label style="display:block;font-size:12px;margin-bottom:.2rem">Volume</label>
         <input type="number" name="volume" min="0" max="1" step="0.05"
-               style="width:70px" placeholder="dflt">
+               style="width:70px" placeholder="dflt"
+               value="{{ add_form.get('volume', '') }}">
       </div>
 
       <div>
         <label style="display:block;font-size:12px;margin-bottom:.2rem">Chance</label>
-        <input type="text" name="chance" value="100%" style="width:65px">
+        <input type="text" name="chance" value="{{ add_form.get('chance', '100%') }}" style="width:65px">
       </div>
 
       <div>
         <label style="display:block;font-size:12px;margin-bottom:.2rem">Cooldown (s)</label>
-        <input type="number" name="trigger_cooldown" value="0" min="0"
+        <input type="number" name="trigger_cooldown" value="{{ add_form.get('trigger_cooldown', '0') }}" min="0"
                style="width:68px">
       </div>
 
@@ -140,6 +144,10 @@
 
 <script>
 const SOUNDS = {{ sounds_json | safe }};
+(function() {
+  const m = document.getElementById('sound_mode');
+  if (m && m.value !== 'new') toggleSoundMode(m.value);
+})();
 
 function toggleSoundMode(mode) {
   const isNew = mode === 'new';

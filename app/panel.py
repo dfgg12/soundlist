@@ -26,6 +26,19 @@ templates = Jinja2Templates(
 )
 
 
+_ADD_FORM_KEY = "add_form"
+
+
+def _stash_form(request: Request, **fields: str | int) -> None:
+    """Save add-trigger form values in the session for repopulation after redirect."""
+    request.session[_ADD_FORM_KEY] = {k: str(v) for k, v in fields.items()}
+
+
+def _pop_form(request: Request) -> dict[str, str]:
+    """Return and clear any stashed add-trigger form values."""
+    return request.session.pop(_ADD_FORM_KEY, {})
+
+
 def _parse_volume(raw: str) -> float | None:
     """Return float for non-empty string, None for blank/invalid."""
     stripped = raw.strip()
@@ -129,6 +142,7 @@ async def channel_editor(
             "sounds": sounds,
             "sounds_json": sounds_json,
             "trigger_hints": trigger_hints,
+            "add_form": _pop_form(request),
             "csrf": csrf_token(request),
             "flashes": get_flashes(request),
         },
@@ -158,10 +172,24 @@ async def add_sound(
 ) -> RedirectResponse:
     """Add a new trigger to the channel, creating or linking a Sound."""
     require_csrf(request, csrf)
+
+    def _err(msg: str) -> RedirectResponse:
+        _stash_form(
+            request,
+            trigger_word=trigger_word,
+            sound_mode=sound_mode,
+            sound_name=sound_name,
+            sound_url=sound_url,
+            volume=volume,
+            chance=chance,
+            trigger_cooldown=trigger_cooldown,
+        )
+        flash(request, msg, "error")
+        return RedirectResponse(f"/c/{slug}", status_code=303)
+
     trigger_word = trigger_word.strip()
     if not trigger_word:
-        flash(request, "Trigger word is required.", "error")
-        return RedirectResponse(f"/c/{slug}", status_code=303)
+        return _err("Trigger word is required.")
     dup = session.exec(
         select(ChannelSound).where(
             ChannelSound.channel_id == channel.id,
@@ -169,26 +197,22 @@ async def add_sound(
         )
     ).first()
     if dup:
-        flash(request, f"Trigger '{trigger_word}' already exists.", "error")
-        return RedirectResponse(f"/c/{slug}", status_code=303)
+        return _err(f"Trigger '{trigger_word}' already exists.")
     sound: Sound | None = None
     if sound_mode == "existing":
         sound_name = sound_name.strip()
         if not sound_name:
-            flash(request, "Enter a sound name.", "error")
-            return RedirectResponse(f"/c/{slug}", status_code=303)
+            return _err("Enter a sound name.")
         sound = session.exec(
             select(Sound).where(Sound.name == sound_name)
         ).first()
         if not sound:
-            flash(request, f"Sound '{sound_name}' not found in library.", "error")
-            return RedirectResponse(f"/c/{slug}", status_code=303)
+            return _err(f"Sound '{sound_name}' not found in library.")
     else:
         sound_name = sound_name.strip() or trigger_word
         sound_url = sound_url.strip()
         if not sound_url:
-            flash(request, "Sound URL is required for a new sound.", "error")
-            return RedirectResponse(f"/c/{slug}", status_code=303)
+            return _err("Sound URL is required for a new sound.")
         sound = session.exec(
             select(Sound).where(Sound.name == sound_name)
         ).first()
@@ -202,13 +226,10 @@ async def add_sound(
             session.add(sound)
             session.flush()
         elif sound.url != sound_url:
-            flash(
-                request,
+            return _err(
                 f"Sound name '{sound_name}' is already taken. "
-                "Use a different name or select from library.",
-                "error",
+                "Use a different name or select from library."
             )
-            return RedirectResponse(f"/c/{slug}", status_code=303)
     cs = ChannelSound(
         channel_id=channel.id,
         sound_id=sound.id,
