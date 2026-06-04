@@ -50,6 +50,17 @@
            form="edit-{{ cs.id }}">
   </td>
   <td style="white-space:nowrap">
+    {% if cs.sound and not cs.sound.is_random and cs.sound.url %}
+    <button type="button" class="btn btn-secondary"
+            style="padding:.2rem .55rem;font-size:12px"
+            onclick="playUrl('{{ cs.sound.url }}', {{ cs.volume if cs.volume is not none else cs.sound.default_volume }})"
+            title="Preview sound">&#9654;</button>
+    {% elif cs.sound and cs.sound.is_random and sound_clips.get(cs.sound_id) %}
+    <button type="button" class="btn btn-secondary"
+            style="padding:.2rem .55rem;font-size:12px"
+            onclick="playRandom({{ sound_clips[cs.sound_id] | tojson }}, {{ cs.volume if cs.volume is not none else cs.sound.default_volume }})"
+            title="Preview random clip">&#9654;</button>
+    {% endif %}
     <button type="submit" form="edit-{{ cs.id }}" class="btn btn-primary btn-sm"
             style="padding:.2rem .55rem;font-size:12px">Save</button>
     <button type="submit" form="delete-{{ cs.id }}" class="btn btn-danger btn-sm"
@@ -144,6 +155,20 @@
 </datalist>
 
 <script>
+var _previewAudio = null;
+
+function playUrl(url, vol) {
+  if (_previewAudio) { _previewAudio.pause(); _previewAudio = null; }
+  _previewAudio = new Audio(url);
+  _previewAudio.volume = Math.min(1, Math.max(0, vol));
+  _previewAudio.play();
+}
+
+function playRandom(urls, vol) {
+  var url = urls[Math.floor(Math.random() * urls.length)];
+  playUrl(url, vol);
+}
+
 const SOUNDS = {{ sounds_json | safe }};
 (function() {
   const m = document.getElementById('sound_mode');

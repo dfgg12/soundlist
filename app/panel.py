@@ -205,6 +205,21 @@ async def channel_editor(
     sounds_json = json.dumps(
         {s.name: {"volume": s.default_volume} for s in sounds}
     )
+    # Load clips for random sounds used in this channel
+    random_sound_ids = [
+        cs.sound_id
+        for cs in channel_sounds
+        if cs.sound and cs.sound.is_random
+    ]
+    sound_clips: dict[int, list[str]] = {}
+    if random_sound_ids:
+        clip_rows = session.exec(
+            select(SoundClip).where(
+                SoundClip.sound_id.in_(random_sound_ids)  # type: ignore[attr-defined]
+            )
+        ).all()
+        for clip in clip_rows:
+            sound_clips.setdefault(clip.sound_id, []).append(clip.url)
     trigger_hints = sorted(set(
         session.exec(
             select(ChannelSound.trigger_word)
@@ -221,6 +236,7 @@ async def channel_editor(
             "channel_sounds": channel_sounds,
             "sounds": sounds,
             "sounds_json": sounds_json,
+            "sound_clips": sound_clips,
             "trigger_hints": trigger_hints,
             "add_form": _pop_form(request),
             "csrf": csrf_token(request),
