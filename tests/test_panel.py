@@ -106,7 +106,9 @@ def test_require_csrf_passes_matching_token():
     require_csrf(req, "good-token")  # no exception
 
 
-def test_require_csrf_rejects_wrong_token():
+def test_require_csrf_rejects_wrong_token(monkeypatch):
+    import app.csrf as csrf_module
+    monkeypatch.setattr(csrf_module.settings, "csrf_enabled", True)
     req = _FakeRequest()
     req.session["csrf_token"] = "real-token"
     with pytest.raises(Exception) as exc_info:
@@ -114,7 +116,9 @@ def test_require_csrf_rejects_wrong_token():
     assert exc_info.value.status_code == 403
 
 
-def test_require_csrf_rejects_missing_session_token():
+def test_require_csrf_rejects_missing_session_token(monkeypatch):
+    import app.csrf as csrf_module
+    monkeypatch.setattr(csrf_module.settings, "csrf_enabled", True)
     req = _FakeRequest()
     with pytest.raises(Exception) as exc_info:
         require_csrf(req, "any-token")
@@ -280,7 +284,7 @@ def test_add_sound_links_existing(client, session, test_channel):
         data={
             "trigger_word": "!shared",
             "sound_mode": "existing",
-            "sound_id": str(sound.id),
+            "sound_name": "shared",
             "chance": "100%",
             "trigger_cooldown": "0",
             "csrf": "ignored",
