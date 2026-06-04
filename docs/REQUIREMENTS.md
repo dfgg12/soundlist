@@ -48,7 +48,7 @@ Status keys: MUST = required for v1, SHOULD = wanted, LATER = deferred.
 
 ### Compatibility
 - FR-24 (MUST) Serve `lists/index.json` and `lists/<slug>.json` in the
-  exact legacy shape from the DB.
+  exact legacy shape from the DB. See Section 5 for the exact contract.
 - FR-25 (MUST) Serve `internals/avatars.json` and `IconTriggers2.json`.
 - FR-26 (MUST) One-time importer loads current `lists/*.json` into the DB
   with lossless round-trip.
@@ -88,6 +88,100 @@ Status keys: MUST = required for v1, SHOULD = wanted, LATER = deferred.
 - DR-4 (MUST) Deleting a Sound in use is blocked (FR-20).
 - DR-5 (MUST) Channel slug stable and unique; it is the JSON filename and
   URL key.
+
+## 5. JSON output contract (NON-NEGOTIABLE)
+
+The backend stores data in SQLite but MUST expose the four endpoints below
+in the exact shapes shown. External software (the public board, app.js)
+depends on these shapes without modification. Do NOT change field names,
+field types, or structure. Whitespace and key order do not matter.
+
+### 5.1 GET /lists/index.json
+
+Object mapping channel slug to its JSON path. Values are always
+"lists/<slug>.json".
+
+```json
+{
+    "Amedoll":       "lists/Amedoll.json",
+    "RadiantSoul_Tv_Sub": "lists/RadiantSoul_Tv_SubSounds.json"
+}
+```
+
+- Key: channel slug (display name used in the URL and filename).
+- Value: path string, always "lists/<slug>.json".
+- Channels without a slug or inactive channels must not appear.
+
+### 5.2 GET /lists/<slug>.json
+
+Object with a single "sounds" array. Each element is one trigger.
+
+```json
+{
+    "sounds": [
+        {
+            "trigger_word":    "meow",
+            "sound":           "https://example.com/meow.ogg",
+            "volume":          0.4,
+            "chance":          "100%",
+            "trigger_cooldown": 0,
+            "enabled":         "true"
+        },
+        {
+            "trigger_word":    "GroanTube",
+            "sound": [
+                "https://example.com/GroanTube1.ogg",
+                "https://example.com/GroanTube2.ogg"
+            ],
+            "volume":          0.7,
+            "chance":          "100%",
+            "trigger_cooldown": 0,
+            "enabled":         "true"
+        }
+    ]
+}
+```
+
+Field rules (all mandatory, no extras):
+- `trigger_word`    - string
+- `sound`           - string for single clip; JSON array of strings for
+                      multi-clip random sounds (DR-3)
+- `volume`          - float (0.0-1.0)
+- `chance`          - string with "%" suffix, e.g. "100%" (DR-2)
+- `trigger_cooldown`- integer (seconds)
+- `enabled`         - string "true" or "false", never boolean (DR-1)
+
+### 5.3 GET /lists/internals/avatars.json
+
+Object mapping channel slug to Twitch avatar URL.
+
+```json
+{
+    "Amedoll": "https://static-cdn.jtvnw.net/...profile_image-70x70.png",
+    "Boshiitime": "https://..."
+}
+```
+
+### 5.4 GET /lists/internals/IconTriggers2.json
+
+Object mapping trigger word to image URL or 7tv emote URL.
+
+```json
+{
+    "meow": "https://cdn.example.com/meow.png",
+    "KEYS": "https://7tv.app/emotes/01GBRJBJMG000BS4BKZQQDARSQ"
+}
+```
+
+### 5.5 Contract enforcement rules
+
+- DR-1 `enabled` MUST be the string "true" or "false", not boolean.
+- DR-2 `chance` MUST be a string with "%" suffix.
+- DR-3 Single-clip `sound` MUST be a plain string; multi-clip MUST be
+  a flat array of URL strings (not an array of objects).
+- All four endpoints are public and unauthenticated (read-only).
+- Content-Type MUST be application/json.
+- HTTP 404 for unknown slug with body {"detail": "not found"}.
 
 ## 4. Acceptance criteria (v1 done when)
 

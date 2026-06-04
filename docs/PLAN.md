@@ -124,14 +124,36 @@ Notes:
 - Random/multi-clip sounds (already in the data) map to `is_random` +
   `SoundClip` rows.
 
-## 5. JSON compatibility layer
+## 5. JSON compatibility layer (hard contract)
 
-`GET /lists/index.json` -> `{ slug: "lists/<slug>.json", ... }`
-`GET /lists/<slug>.json` -> `{ "sounds": [ { trigger_word, sound,
-volume, chance, trigger_cooldown, enabled }, ... ] }` where `sound` is a
-string for single sounds or the legacy clip array for random ones.
-`GET /lists/internals/avatars.json` and `.../IconTriggers2.json` served
-from DB / imported tables.
+SQLite is the internal store. The four endpoints below regenerate the
+legacy JSON on every request. The output shape is a HARD CONTRACT because
+the public board (app.js) and any downstream tools consume it without
+change.
+
+The serializer (T1.4) is the single place that enforces these rules:
+- `enabled`  -> string "true"/"false", never boolean
+- `chance`   -> string with "%" suffix
+- `sound`    -> plain string for single-clip, flat string array for multi
+
+Endpoints:
+
+  GET /lists/index.json
+    { "<slug>": "lists/<slug>.json", ... }
+
+  GET /lists/<slug>.json
+    { "sounds": [ { "trigger_word": str, "sound": str|[str,...],
+      "volume": float, "chance": "N%", "trigger_cooldown": int,
+      "enabled": "true"|"false" }, ... ] }
+
+  GET /lists/internals/avatars.json
+    { "<slug>": "<avatar_url>", ... }
+
+  GET /lists/internals/IconTriggers2.json
+    { "<trigger_word>": "<image_or_7tv_url>", ... }
+
+All four are public (no auth). Unknown slug -> 404.
+See REQUIREMENTS.md Section 5 for full field rules and annotated examples.
 
 The public board's `app.js` only changes its base path (or nothing, if we
 mount the app at the same origin and route `/lists/*`).
