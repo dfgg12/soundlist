@@ -11,6 +11,7 @@ from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from starlette.middleware.sessions import SessionMiddleware
 
+from app.admin import router as admin_router
 from app.auth import router as auth_router
 from app.auth import seed_admins
 from app.db import create_db_and_tables
@@ -44,6 +45,7 @@ app = FastAPI(
 )
 
 app.include_router(auth_router)
+app.include_router(admin_router)
 app.include_router(lists_router)
 app.include_router(panel_router)
 app.include_router(library_router)

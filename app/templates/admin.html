@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block title %}Admin - Soundlist{% endblock %}
+{% block content %}
+<h1>Admin Panel</h1>
+
+<div class="card">
+  <h2 style="margin-top:0">Create channel</h2>
+  <form method="post" action="/admin/channel/create" style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:flex-end">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <div>
+      <label style="display:block;font-size:12px;color:#555;margin-bottom:.2rem">Slug</label>
+      <input type="text" name="slug" placeholder="channelname" required style="width:160px">
+    </div>
+    <div>
+      <label style="display:block;font-size:12px;color:#555;margin-bottom:.2rem">Display name</label>
+      <input type="text" name="display_name" placeholder="(defaults to slug)" style="width:180px">
+    </div>
+    <div>
+      <label style="display:block;font-size:12px;color:#555;margin-bottom:.2rem">Owner login</label>
+      <input type="text" name="owner_login" placeholder="twitch login (optional)" style="width:180px">
+    </div>
+    <button type="submit" class="btn btn-primary">Create</button>
+  </form>
+</div>
+
+<div class="card">
+  <h2 style="margin-top:0">Channels ({{ channels|length }})</h2>
+  {% if channels %}
+  <table>
+    <thead>
+      <tr>
+        <th>Slug</th>
+        <th>Display name</th>
+        <th>Owner</th>
+        <th>Assign owner</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for ch in channels %}
+      <tr>
+        <td><a href="/c/{{ ch.slug }}">{{ ch.slug }}</a></td>
+        <td>{{ ch.display_name }}</td>
+        <td>{{ owner_map.get(ch.id, "—") }}</td>
+        <td>
+          <form method="post" action="/admin/channel/{{ ch.slug }}/assign" style="display:flex;gap:.35rem">
+            <input type="hidden" name="csrf" value="{{ csrf }}">
+            <input type="text" name="owner_login" placeholder="login or blank to unassign" style="width:200px">
+            <button type="submit" class="btn btn-secondary" style="font-size:12px;padding:.2rem .5rem">Set</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p style="color:#777">No channels yet.</p>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2 style="margin-top:0">Users ({{ users|length }})</h2>
+  {% if users %}
+  <table>
+    <thead>
+      <tr>
+        <th>Login</th>
+        <th>Display name</th>
+        <th>Admin</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for u in users %}
+      <tr>
+        <td>{{ u.login }}</td>
+        <td>{{ u.display_name }}</td>
+        <td>{% if u.is_admin %}<span class="badge badge-on">yes</span>{% else %}<span class="badge badge-off">no</span>{% endif %}</td>
+        <td>
+          {% if u.login != user.login %}
+          <form method="post" action="/admin/user/{{ u.login }}/toggle-admin" style="display:inline">
+            <input type="hidden" name="csrf" value="{{ csrf }}">
+            <button type="submit" class="btn btn-secondary" style="font-size:12px;padding:.2rem .5rem">
+              {% if u.is_admin %}Revoke admin{% else %}Grant admin{% endif %}
+            </button>
+          </form>
+          {% else %}
+          <span style="color:#999;font-size:12px">(you)</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p style="color:#777">No users yet.</p>
+  {% endif %}
+</div>
+{% endblock %}
