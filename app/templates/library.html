@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+{% block title %}Library - Soundlist{% endblock %}
+{% block content %}
+<h1>Sound library</h1>
+
+<form method="get" action="/library" style="margin-bottom:.9rem">
+  <input type="text" name="q" value="{{ q }}" placeholder="Search by name"
+         style="width:240px">
+  <button type="submit" class="btn btn-secondary">Search</button>
+  {% if q %}<a href="/library" style="margin-left:.5rem;font-size:12px">clear</a>{% endif %}
+</form>
+
+<h2>Assets ({{ sounds | length }})</h2>
+<table>
+<thead>
+<tr>
+  <th>Name</th>
+  <th>Type</th>
+  <th>URL / clips</th>
+  <th>Default vol</th>
+  <th>Used by</th>
+  <th>Actions</th>
+</tr>
+</thead>
+<tbody>
+{% for s in sounds %}
+{% set used = counts.get(s.id, 0) %}
+<tr>
+  <td>
+    <input type="text" name="name" value="{{ s.name }}"
+           form="edit-{{ s.id }}" style="width:150px">
+  </td>
+  <td>
+    {% if s.is_random %}<span class="badge badge-off">random</span>
+    {% else %}<span class="badge badge-on">single</span>{% endif %}
+  </td>
+  <td style="font-size:12px;color:#555">
+    {% if s.is_random %}
+      {{ s.clips | length }} clip(s) - edit on its own page
+    {% else %}
+      <input type="url" name="url" value="{{ s.url or '' }}"
+             form="edit-{{ s.id }}" style="width:280px">
+    {% endif %}
+  </td>
+  <td>
+    <input type="number" name="default_volume" value="{{ s.default_volume }}"
+           form="edit-{{ s.id }}" min="0" max="1" step="0.05" style="width:70px">
+  </td>
+  <td style="text-align:center">{{ used }}</td>
+  <td style="white-space:nowrap">
+    {% if not s.is_random %}
+    <button type="submit" form="edit-{{ s.id }}" class="btn btn-primary"
+            style="padding:.2rem .55rem;font-size:12px">Save</button>
+    {% endif %}
+    <button type="submit" form="del-{{ s.id }}" class="btn btn-danger"
+            style="padding:.2rem .55rem;font-size:12px"
+            {% if used %}disabled title="In use by {{ used }} channel(s)"{% endif %}
+            onclick="return confirm('Delete asset \'{{ s.name }}\'?')">Del</button>
+  </td>
+</tr>
+<form id="edit-{{ s.id }}" method="post" action="/library/{{ s.id }}"
+      style="display:none">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+</form>
+<form id="del-{{ s.id }}" method="post" action="/library/{{ s.id }}/delete"
+      style="display:none">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+</form>
+{% else %}
+<tr><td colspan="6" style="color:#888;padding:.75rem">No assets{% if q %} match '{{ q }}'{% endif %}.</td></tr>
+{% endfor %}
+</tbody>
+</table>
+
+{# --- Create asset (T4.2) --- #}
+<h2>New asset</h2>
+<div class="card">
+  <form method="post" action="/library">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <div style="display:flex;flex-wrap:wrap;gap:.75rem;align-items:flex-end">
+      <div>
+        <label style="display:block;font-size:12px;margin-bottom:.2rem">Name *</label>
+        <input type="text" name="name" required style="width:160px">
+      </div>
+      <div>
+        <label style="display:block;font-size:12px;margin-bottom:.2rem">Default volume</label>
+        <input type="number" name="default_volume" value="0.5"
+               min="0" max="1" step="0.05" style="width:80px">
+      </div>
+      <div>
+        <label style="font-size:12px">
+          <input type="checkbox" name="is_random" id="is_random"
+                 onchange="toggleRandom(this.checked)"> Random (multi-clip)
+        </label>
+      </div>
+      <div id="single_field">
+        <label style="display:block;font-size:12px;margin-bottom:.2rem">URL *</label>
+        <input type="url" name="url" style="width:300px" placeholder="https://...">
+      </div>
+    </div>
+
+    <div id="random_fields" style="display:none;margin-top:.75rem">
+      <label style="display:block;font-size:12px;margin-bottom:.3rem">Clips</label>
+      <div id="clip_rows"></div>
+      <button type="button" class="btn btn-secondary" style="font-size:12px"
+              onclick="addClip()">+ Add clip</button>
+    </div>
+
+    <div style="margin-top:.75rem">
+      <button type="submit" class="btn btn-primary">Create asset</button>
+    </div>
+  </form>
+</div>
+
+<script>
+function toggleRandom(on) {
+  document.getElementById('single_field').style.display = on ? 'none' : '';
+  document.getElementById('random_fields').style.display = on ? '' : 'none';
+  document.querySelector('#single_field input').required = !on;
+  if (on && !document.querySelector('#clip_rows .clip-row')) addClip();
+}
+function addClip() {
+  const row = document.createElement('div');
+  row.className = 'clip-row';
+  row.style.cssText = 'display:flex;gap:.4rem;margin-bottom:.35rem';
+  row.innerHTML =
+    '<input type="url" name="clip_url" placeholder="clip URL" style="width:300px">' +
+    '<input type="number" name="clip_volume" placeholder="vol" min="0" max="1" step="0.05" style="width:70px">' +
+    '<input type="text" name="clip_chance" placeholder="chance" value="100%" style="width:75px">' +
+    '<button type="button" class="btn btn-danger" style="font-size:12px" onclick="this.parentNode.remove()">x</button>';
+  document.getElementById('clip_rows').appendChild(row);
+}
+</script>
+{% endblock %}
