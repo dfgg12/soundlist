@@ -8,6 +8,7 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
+from sqlalchemy import func
 from sqlalchemy.orm import selectinload
 from sqlmodel import Session, select
 
@@ -59,14 +60,16 @@ async def dashboard(
     if user:
         if user.is_admin:
             channels = list(
-                session.exec(select(Channel).order_by(Channel.slug)).all()
+                session.exec(
+                    select(Channel).order_by(func.lower(Channel.slug))
+                ).all()
             )
         else:
             channels = list(
                 session.exec(
                     select(Channel)
                     .where(Channel.owner_id == user.id)
-                    .order_by(Channel.slug)
+                    .order_by(func.lower(Channel.slug))
                 ).all()
             )
     return templates.TemplateResponse(

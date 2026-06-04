@@ -3,6 +3,14 @@
 {% block content %}
 <h1>Admin Panel</h1>
 
+<div class="card" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem">
+  <span style="font-weight:600">Actions</span>
+  <form method="post" action="/admin/refresh-avatars">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <button type="submit" class="btn btn-secondary">Refresh all avatars from Twitch</button>
+  </form>
+</div>
+
 <div class="card">
   <h2 style="margin-top:0">Create channel</h2>
   <form method="post" action="/admin/channel/create" style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:flex-end">

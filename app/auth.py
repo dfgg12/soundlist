@@ -86,6 +86,24 @@ def _upsert_user(session: Session, twitch_data: dict) -> User:
     return user
 
 
+def _sync_channel_avatars(session: Session, user: User) -> None:
+    """Copy user avatar_url to all channels owned by this user."""
+    if not user.avatar_url:
+        return
+    channels = session.exec(
+        select(Channel).where(Channel.owner_id == user.id)
+    ).all()
+    updated = 0
+    for ch in channels:
+        if ch.avatar_url != user.avatar_url:
+            ch.avatar_url = user.avatar_url
+            session.add(ch)
+            updated += 1
+    if updated:
+        session.commit()
+        log.info("synced avatar for %d channel(s) of %s", updated, user.login)
+
+
 def _claim_channels(session: Session, user: User) -> None:
     """Assign owner_id on unowned channels whose slug matches user login."""
     unclaimed = session.exec(
@@ -128,6 +146,7 @@ async def auth_callback(
         ) from exc
     user = _upsert_user(session, twitch_data)
     _claim_channels(session, user)
+    _sync_channel_avatars(session, user)
     request.session["user_id"] = user.id
     return RedirectResponse("/", status_code=302)
 
