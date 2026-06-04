@@ -103,6 +103,21 @@ def _replace_clips(
 # ---------------------------------------------------------------------------
 
 
+def _clips_map(session: Session, sound_ids: list[int]) -> dict[int, list[str]]:
+    """Return {sound_id: [url, ...]} for random sounds."""
+    if not sound_ids:
+        return {}
+    rows = session.exec(
+        select(SoundClip).where(
+            SoundClip.sound_id.in_(sound_ids)  # type: ignore[attr-defined]
+        )
+    ).all()
+    result: dict[int, list[str]] = {}
+    for clip in rows:
+        result.setdefault(clip.sound_id, []).append(clip.url)
+    return result
+
+
 @router.get("/library", response_class=HTMLResponse)
 async def library_index(
     request: Request,
@@ -118,6 +133,8 @@ async def library_index(
         stmt = stmt.where(Sound.name.ilike(like))  # type: ignore[attr-defined]
     sounds = list(session.exec(stmt).all())
     counts = _usage_counts(session, [s.id for s in sounds if s.id])
+    random_ids = [s.id for s in sounds if s.is_random and s.id]
+    clips = _clips_map(session, random_ids)
     return templates.TemplateResponse(
         request,
         "library.html",
@@ -125,6 +142,7 @@ async def library_index(
             "user": user,
             "sounds": sounds,
             "counts": counts,
+            "clips": clips,
             "q": term,
             "csrf": csrf_token(request),
             "flashes": get_flashes(request),

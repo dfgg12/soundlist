@@ -27,8 +27,12 @@
 {% set used = counts.get(s.id, 0) %}
 <tr>
   <td>
+    {% if user.is_admin %}
     <input type="text" name="name" value="{{ s.name }}"
            form="edit-{{ s.id }}" style="width:150px">
+    {% else %}
+    {{ s.name }}
+    {% endif %}
   </td>
   <td>
     {% if s.is_random %}<span class="badge badge-off">random</span>
@@ -36,18 +40,39 @@
   </td>
   <td style="font-size:12px;color:#555">
     {% if s.is_random %}
-      {{ s.clips | length }} clip(s) - edit on its own page
+      {{ s.clips | length }} clip(s){% if user.is_admin %} - edit on its own page{% endif %}
     {% else %}
+      {% if user.is_admin %}
       <input type="url" name="url" value="{{ s.url or '' }}"
              form="edit-{{ s.id }}" style="width:280px">
+      {% else %}
+      <span style="word-break:break-all">{{ s.url or '' }}</span>
+      {% endif %}
     {% endif %}
   </td>
   <td>
+    {% if user.is_admin %}
     <input type="number" name="default_volume" value="{{ s.default_volume }}"
            form="edit-{{ s.id }}" min="0" max="1" step="0.05" style="width:70px">
+    {% else %}
+    {{ s.default_volume }}
+    {% endif %}
   </td>
   <td style="text-align:center">{{ used }}</td>
   <td style="white-space:nowrap">
+    {# play button for all users #}
+    {% if not s.is_random and s.url %}
+    <button type="button" class="btn btn-secondary"
+            style="padding:.2rem .55rem;font-size:12px"
+            onclick="playUrl('{{ s.url }}', {{ s.default_volume }})"
+            title="Preview sound">&#9654;</button>
+    {% elif s.is_random and clips.get(s.id) %}
+    <button type="button" class="btn btn-secondary"
+            style="padding:.2rem .55rem;font-size:12px"
+            onclick="playRandom({{ clips[s.id] | tojson }}, {{ s.default_volume }})"
+            title="Preview random clip">&#9654;</button>
+    {% endif %}
+    {% if user.is_admin %}
     {% if not s.is_random %}
     <button type="submit" form="edit-{{ s.id }}" class="btn btn-primary"
             style="padding:.2rem .55rem;font-size:12px">Save</button>
@@ -56,8 +81,10 @@
             style="padding:.2rem .55rem;font-size:12px"
             {% if used %}disabled title="In use by {{ used }} channel(s)"{% endif %}
             onclick="return confirm('Delete asset \'{{ s.name }}\'?')">Del</button>
+    {% endif %}
   </td>
 </tr>
+{% if user.is_admin %}
 <form id="edit-{{ s.id }}" method="post" action="/library/{{ s.id }}"
       style="display:none">
   <input type="hidden" name="csrf" value="{{ csrf }}">
@@ -66,12 +93,14 @@
       style="display:none">
   <input type="hidden" name="csrf" value="{{ csrf }}">
 </form>
+{% endif %}
 {% else %}
 <tr><td colspan="6" style="color:#888;padding:.75rem">No assets{% if q %} match '{{ q }}'{% endif %}.</td></tr>
 {% endfor %}
 </tbody>
 </table>
 
+{% if user.is_admin %}
 {# --- Create asset (T4.2) --- #}
 <h2>New asset</h2>
 <div class="card">
@@ -111,8 +140,24 @@
     </div>
   </form>
 </div>
+{% endif %}
 
 <script>
+var _previewAudio = null;
+
+function playUrl(url, vol) {
+  if (_previewAudio) { _previewAudio.pause(); _previewAudio = null; }
+  _previewAudio = new Audio(url);
+  _previewAudio.volume = Math.min(1, Math.max(0, vol));
+  _previewAudio.play();
+}
+
+function playRandom(urls, vol) {
+  var url = urls[Math.floor(Math.random() * urls.length)];
+  playUrl(url, vol);
+}
+
+{% if user.is_admin %}
 function toggleRandom(on) {
   document.getElementById('single_field').style.display = on ? 'none' : '';
   document.getElementById('random_fields').style.display = on ? '' : 'none';
@@ -130,5 +175,6 @@ function addClip() {
     '<button type="button" class="btn btn-danger" style="font-size:12px" onclick="this.parentNode.remove()">x</button>';
   document.getElementById('clip_rows').appendChild(row);
 }
+{% endif %}
 </script>
 {% endblock %}
