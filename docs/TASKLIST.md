@@ -45,11 +45,11 @@ Maps to milestones M1-M6 in PLAN.md.
 
 ## M4 - Shared library and linking
 
-- [ ] T4.1 Library `/library`: list + search assets, usage count.
-- [ ] T4.2 Create asset `POST /library` (single or random + clips).
-- [ ] T4.3 Link asset to channel from editor (reuse T3.4 path).
-- [ ] T4.4 Edit asset; propagates to all linked channels.
-- [ ] T4.5 Block delete of an in-use asset; show using channels.
+- [x] T4.1 Library `/library`: list + search assets, usage count.
+- [x] T4.2 Create asset `POST /library` (single or random + clips).
+- [x] T4.3 Link asset to channel from editor (reuse T3.4 path).
+- [x] T4.4 Edit asset; propagates to all linked channels.
+- [x] T4.5 Block delete of an in-use asset; show using channels.
 
 ## M5 - Testing / setup view
 
