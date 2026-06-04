@@ -9,6 +9,7 @@ import httpx
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
+from sqlalchemy import func
 from sqlmodel import Session, select
 
 from app.auth import require_user
@@ -39,9 +40,13 @@ async def admin_index(
     admin: User = Depends(_require_admin),
 ) -> HTMLResponse:
     """Render admin panel with user and channel tables."""
-    users = list(session.exec(select(User).order_by(User.login)).all())
+    users = list(
+        session.exec(select(User).order_by(func.lower(User.login))).all()
+    )
     channels = list(
-        session.exec(select(Channel).order_by(Channel.slug)).all()
+        session.exec(
+            select(Channel).order_by(func.lower(Channel.slug))
+        ).all()
     )
     owner_map: dict[int, str] = {}
     for ch in channels:
