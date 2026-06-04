@@ -5,10 +5,14 @@
   {% if channel.avatar_url %}<img src="{{ channel.avatar_url }}" style="width:36px;height:36px;border-radius:50%">{% endif %}
   <h1 style="margin:0">{{ channel.display_name or channel.slug }}</h1>
   <a href="/lists/{{ channel.slug }}.json" target="_blank" style="font-size:12px;color:#7c3aed;margin-left:.5rem">[ JSON ]</a>
-  <a href="/c/{{ channel.slug }}/test" style="font-size:12px;color:#059669;margin-left:.3rem">[ Test ]</a>
 </div>
 
-<h2>Triggers ({{ channel_sounds | length }})</h2>
+<div style="display:flex;gap:.5rem;margin-bottom:.6rem;align-items:center">
+  <h2 style="margin:0">Triggers ({{ channel_sounds | length }})</h2>
+  <button class="btn btn-danger" onclick="stopAll()"
+          style="padding:.2rem .6rem;font-size:12px;margin-left:.75rem">Stop</button>
+  <span id="now-playing" style="font-size:12px;color:#555"></span>
+</div>
 
 <table>
 <thead>
@@ -24,17 +28,22 @@
 </thead>
 <tbody>
 {% for cs in channel_sounds %}
-<tr>
+<tr{% if not cs.enabled %} style="opacity:.45"{% endif %}>
   <td>
     <input type="text" name="trigger_word" value="{{ cs.trigger_word }}"
            form="edit-{{ cs.id }}" style="width:130px" list="trigger-hints">
   </td>
-  <td style="color:#555;font-size:12px">{{ cs.sound.name if cs.sound else '?' }}</td>
+  <td style="color:#555;font-size:12px">
+    {{ cs.sound.name if cs.sound else '?' }}
+    {% if cs.sound and cs.sound.is_random %}
+    <span style="font-size:11px;color:#7c3aed">({{ sound_clips.get(cs.sound_id, []) | length }} clips)</span>
+    {% endif %}
+  </td>
   <td>
     <input type="number" name="volume"
-           value="{{ cs.volume if cs.volume is not none else '' }}"
-           form="edit-{{ cs.id }}" min="0" max="1" step="0.05"
-           style="width:68px" placeholder="dflt">
+           value="{{ cs.volume if cs.volume is not none else (cs.sound.default_volume if cs.sound else '') }}"
+           form="edit-{{ cs.id }}" min="0" max="1" step="0.01"
+           style="width:68px">
   </td>
   <td>
     <input type="text" name="chance" value="{{ cs.chance }}"
@@ -51,14 +60,14 @@
   </td>
   <td style="white-space:nowrap">
     {% if cs.sound and not cs.sound.is_random and cs.sound.url %}
-    <button type="button" class="btn btn-secondary"
+    <button type="button" class="btn btn-secondary play-btn"
             style="padding:.2rem .55rem;font-size:12px"
-            onclick="playUrl('{{ cs.sound.url }}', {{ cs.volume if cs.volume is not none else cs.sound.default_volume }})"
+            onclick="playUrl({{ cs.sound.url | tojson }}, {{ cs.volume if cs.volume is not none else cs.sound.default_volume }}, this, {{ cs.trigger_word | tojson }})"
             title="Preview sound">&#9654;</button>
     {% elif cs.sound and cs.sound.is_random and sound_clips.get(cs.sound_id) %}
-    <button type="button" class="btn btn-secondary"
+    <button type="button" class="btn btn-secondary play-btn"
             style="padding:.2rem .55rem;font-size:12px"
-            onclick="playRandom({{ sound_clips[cs.sound_id] | tojson }}, {{ cs.volume if cs.volume is not none else cs.sound.default_volume }})"
+            onclick="playRandom({{ sound_clips[cs.sound_id] | tojson }}, {{ cs.volume if cs.volume is not none else cs.sound.default_volume }}, this, {{ cs.trigger_word | tojson }})"
             title="Preview random clip">&#9654;</button>
     {% endif %}
     <button type="submit" form="edit-{{ cs.id }}" class="btn btn-primary btn-sm"
@@ -124,7 +133,7 @@
 
       <div>
         <label style="display:block;font-size:12px;margin-bottom:.2rem">Volume</label>
-        <input type="number" name="volume" min="0" max="1" step="0.05"
+        <input type="number" name="volume" min="0" max="1" step="0.01"
                style="width:70px" placeholder="dflt"
                value="{{ add_form.get('volume', '') }}">
       </div>
@@ -147,6 +156,32 @@
   </form>
 </div>
 
+{# --- Validate --- #}
+<h2 style="margin-top:1.25rem">Validate</h2>
+<div class="card" style="display:flex;flex-wrap:wrap;gap:.75rem;align-items:flex-end">
+  <div>
+    <label style="display:block;font-size:12px;margin-bottom:.2rem">Sound URL</label>
+    <input type="url" id="val-url" style="width:320px" placeholder="https://...">
+  </div>
+  <div>
+    <label style="display:block;font-size:12px;margin-bottom:.2rem">Trigger word</label>
+    <input type="text" id="val-trigger" style="width:140px" placeholder="e.g. !bruh">
+  </div>
+  <button class="btn btn-secondary" onclick="runValidate()">Check</button>
+  <span id="val-result" style="font-size:12px"></span>
+</div>
+
+{# --- Channel JSON --- #}
+<h2 style="margin-top:1.25rem">
+  Channel JSON
+  <button onclick="toggleJson()" class="btn btn-secondary"
+          style="font-size:11px;padding:.15rem .45rem;margin-left:.5rem"
+          id="json-toggle">Show</button>
+</h2>
+<pre id="json-block" style="display:none;background:#1e1e2e;color:#cdd6f4;
+     padding:1rem;border-radius:6px;font-size:12px;overflow-x:auto;
+     max-height:420px;overflow-y:auto">{{ channel_json | safe }}</pre>
+
 <datalist id="trigger-hints">
   {% for word in trigger_hints %}<option value="{{ word }}">{% endfor %}
 </datalist>
@@ -155,28 +190,72 @@
 </datalist>
 
 <script>
-var _previewAudio = null;
+var _audio = null;
+var _activeBtn = null;
 
-function playUrl(url, vol) {
-  if (_previewAudio) { _previewAudio.pause(); _previewAudio = null; }
-  _previewAudio = new Audio(url);
-  _previewAudio.volume = Math.min(1, Math.max(0, vol));
-  _previewAudio.play();
+function stopAll() {
+  if (_audio) { try { _audio.pause(); } catch(e) {} _audio = null; }
+  if (_activeBtn) { _activeBtn.textContent = '▶'; _activeBtn.disabled = false; _activeBtn = null; }
+  document.getElementById('now-playing').textContent = '';
 }
 
-function playRandom(urls, vol) {
-  var url = urls[Math.floor(Math.random() * urls.length)];
-  playUrl(url, vol);
+function _doPlay(url, vol, btn, label) {
+  stopAll();
+  _audio = new Audio(url);
+  _audio.volume = Math.min(1, Math.max(0, vol));
+  if (btn) { _activeBtn = btn; btn.textContent = '...'; btn.disabled = true; }
+  document.getElementById('now-playing').textContent = label || '';
+  _audio.addEventListener('ended', function() {
+    if (_activeBtn === btn) { btn.textContent = '▶'; btn.disabled = false; _activeBtn = null; }
+    document.getElementById('now-playing').textContent = '';
+    _audio = null;
+  });
+  _audio.addEventListener('error', function() {
+    if (_activeBtn === btn) { btn.textContent = 'ERR'; btn.disabled = false; _activeBtn = null; }
+    document.getElementById('now-playing').textContent = 'Load error: ' + url;
+    _audio = null;
+  });
+  _audio.play().catch(function(err) {
+    if (_activeBtn === btn) { btn.textContent = '▶'; btn.disabled = false; _activeBtn = null; }
+    document.getElementById('now-playing').textContent = 'Blocked: ' + err.message;
+    _audio = null;
+  });
+}
+
+function playUrl(url, vol, btn, label) {
+  _doPlay(url, vol, btn || null, label || '');
+}
+
+function playRandom(clips, vol, btn, label) {
+  var table = clips.filter(function(c) {
+    var p = parseFloat(c.chance); return !isNaN(p) && p > 0;
+  }).map(function(c) {
+    return {url: c.url, vol: c.volume, w: parseFloat(c.chance)};
+  });
+  var picked;
+  if (!table.length) {
+    picked = {url: clips[0].url, vol: clips[0].volume};
+  } else {
+    var total = table.reduce(function(s, r) { return s + r.w; }, 0);
+    var roll = Math.random() * total, i;
+    picked = table[table.length - 1];
+    for (i = 0; i < table.length; i++) {
+      roll -= table[i].w;
+      if (roll <= 0) { picked = table[i]; break; }
+    }
+  }
+  var clipVol = typeof picked.vol === 'number' ? picked.vol : vol;
+  _doPlay(picked.url, clipVol, btn || null, label || '');
 }
 
 const SOUNDS = {{ sounds_json | safe }};
 (function() {
-  const m = document.getElementById('sound_mode');
+  var m = document.getElementById('sound_mode');
   if (m && m.value !== 'new') toggleSoundMode(m.value);
 })();
 
 function toggleSoundMode(mode) {
-  const isNew = mode === 'new';
+  var isNew = mode === 'new';
   document.getElementById('sound_url_field').style.display = isNew ? '' : 'none';
   document.getElementById('sound_url').required = isNew;
   document.getElementById('sound_name_label').textContent =
@@ -188,14 +267,47 @@ function toggleSoundMode(mode) {
 
 function onSoundNameInput(name) {
   if (document.getElementById('sound_mode').value !== 'existing') return;
-  const s = SOUNDS[name];
+  var s = SOUNDS[name];
   if (!s) return;
-  const tw = document.querySelector('[name=trigger_word]');
-  const vol = document.querySelector('[name=volume]');
-  const cd = document.querySelector('[name=trigger_cooldown]');
+  var tw = document.querySelector('[name=trigger_word]');
+  var vol = document.querySelector('[name=volume]');
+  var cd = document.querySelector('[name=trigger_cooldown]');
   if (tw && !tw.value) tw.value = name;
   if (vol && !vol.value) vol.value = s.volume !== 0.5 ? s.volume : '';
   if (cd && !cd.value) cd.value = 0;
+}
+
+async function runValidate() {
+  var url = document.getElementById('val-url').value.trim();
+  var trigger = document.getElementById('val-trigger').value.trim();
+  var el = document.getElementById('val-result');
+  if (!url && !trigger) { el.textContent = 'Enter a URL or trigger word.'; return; }
+  el.textContent = 'Checking...';
+  el.style.color = '';
+  var params = new URLSearchParams();
+  if (url) params.set('url', url);
+  if (trigger) params.set('trigger_word', trigger);
+  try {
+    var r = await fetch('/c/{{ channel.slug }}/validate?' + params);
+    var d = await r.json();
+    var parts = [];
+    if ('url_ok' in d) parts.push('URL: ' + (d.url_ok
+      ? 'OK (' + d.url_status + ')'
+      : 'FAIL' + (d.url_error ? ' - ' + d.url_error : ' (' + d.url_status + ')')));
+    if ('trigger_unique' in d) parts.push('Trigger: ' + (d.trigger_unique ? 'unique' : 'DUPLICATE'));
+    el.textContent = parts.join(' | ');
+    el.style.color = (d.url_ok === false || d.trigger_unique === false) ? '#dc2626' : '#059669';
+  } catch(e) {
+    el.textContent = 'Error: ' + e.message;
+    el.style.color = '#dc2626';
+  }
+}
+
+function toggleJson() {
+  var el = document.getElementById('json-block');
+  var btn = document.getElementById('json-toggle');
+  if (el.style.display === 'none') { el.style.display = ''; btn.textContent = 'Hide'; }
+  else { el.style.display = 'none'; btn.textContent = 'Show'; }
 }
 </script>
 {% endblock %}

@@ -205,13 +205,13 @@ async def channel_editor(
     sounds_json = json.dumps(
         {s.name: {"volume": s.default_volume} for s in sounds}
     )
-    # Load clips for random sounds used in this channel
+    # Load clips (with volume+chance) for random sounds used in this channel
     random_sound_ids = [
         cs.sound_id
         for cs in channel_sounds
         if cs.sound and cs.sound.is_random
     ]
-    sound_clips: dict[int, list[str]] = {}
+    sound_clips: dict[int, list[dict]] = {}
     if random_sound_ids:
         clip_rows = session.exec(
             select(SoundClip).where(
@@ -219,7 +219,9 @@ async def channel_editor(
             )
         ).all()
         for clip in clip_rows:
-            sound_clips.setdefault(clip.sound_id, []).append(clip.url)
+            sound_clips.setdefault(clip.sound_id, []).append(
+                {"url": clip.url, "volume": clip.volume, "chance": clip.chance}
+            )
     trigger_hints = sorted(set(
         session.exec(
             select(ChannelSound.trigger_word)
@@ -227,6 +229,7 @@ async def channel_editor(
             .distinct()
         ).all()
     ))
+    channel_json = json.dumps(channel_to_dict(channel, session), indent=2)
     return templates.TemplateResponse(
         request,
         "channel.html",
@@ -237,6 +240,7 @@ async def channel_editor(
             "sounds": sounds,
             "sounds_json": sounds_json,
             "sound_clips": sound_clips,
+            "channel_json": channel_json,
             "trigger_hints": trigger_hints,
             "add_form": _pop_form(request),
             "csrf": csrf_token(request),
@@ -401,77 +405,6 @@ async def delete_sound(
 # ---------------------------------------------------------------------------
 # Toggle enabled (T3.5)
 # ---------------------------------------------------------------------------
-
-
-# ---------------------------------------------------------------------------
-# Test / audition view (T5.1, T5.2)
-# ---------------------------------------------------------------------------
-
-
-@router.get("/c/{slug}/test", response_class=HTMLResponse)
-async def channel_test(
-    slug: str,
-    request: Request,
-    session: Session = Depends(get_session),
-    user: User = Depends(require_user),
-    channel: Channel = Depends(require_channel_access),
-) -> HTMLResponse:
-    """Render in-browser audio test page with live JSON preview."""
-    channel_sounds = list(
-        session.exec(
-            select(ChannelSound)
-            .where(ChannelSound.channel_id == channel.id)
-            .options(
-                selectinload(ChannelSound.sound)  # type: ignore[arg-type]
-            )
-            .order_by(ChannelSound.position, ChannelSound.id)
-        ).all()
-    )
-    test_items: list[dict] = []
-    for cs in channel_sounds:
-        sound = cs.sound
-        if sound is None:
-            continue
-        effective_vol = (
-            cs.volume if cs.volume is not None else sound.default_volume
-        )
-        item: dict = {
-            "id": cs.id,
-            "trigger_word": cs.trigger_word,
-            "sound_name": sound.name,
-            "volume": effective_vol,
-            "chance": cs.chance,
-            "enabled": cs.enabled,
-            "is_random": sound.is_random,
-        }
-        if sound.is_random:
-            clips = list(
-                session.exec(
-                    select(SoundClip)
-                    .where(SoundClip.sound_id == sound.id)
-                    .order_by(SoundClip.id)
-                ).all()
-            )
-            item["clips"] = [
-                {"url": c.url, "volume": c.volume, "chance": c.chance}
-                for c in clips
-            ]
-        else:
-            item["url"] = sound.url or ""
-        test_items.append(item)
-
-    channel_json = json.dumps(channel_to_dict(channel, session), indent=2)
-    return templates.TemplateResponse(
-        request,
-        "test.html",
-        {
-            "user": user,
-            "channel": channel,
-            "test_items_json": json.dumps(test_items),
-            "channel_json": channel_json,
-            "flashes": get_flashes(request),
-        },
-    )
 
 
 @router.get("/c/{slug}/validate", response_class=JSONResponse)
