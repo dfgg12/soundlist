@@ -265,6 +265,7 @@ async def channel_editor(
             "sounds": sounds,
             "sounds_json": sounds_json,
             "sound_clips": sound_clips,
+            "preview_items": preview_items,
             "preview_items_json": json.dumps(preview_items),
             "channel_json": channel_json,
             "trigger_hints": trigger_hints,
