@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 
+import uvicorn
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from starlette.middleware.sessions import SessionMiddleware
@@ -45,3 +46,14 @@ async def on_startup() -> None:
 async def healthcheck() -> JSONResponse:
     """Return 200 when the app is alive."""
     return JSONResponse({"status": "ok"})
+
+
+def main() -> None:
+    """Start uvicorn; entry point for `uv run soundlist` and `python -m app`."""
+    uvicorn.run(
+        "app.main:app",
+        host="0.0.0.0",
+        port=8000,
+        reload=not settings.is_production,
+        log_level="info",
+    )
