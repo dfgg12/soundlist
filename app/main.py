@@ -1,0 +1,44 @@
+"""FastAPI application entry point."""
+
+from __future__ import annotations
+
+import logging
+
+from fastapi import FastAPI
+from fastapi.responses import JSONResponse
+from starlette.middleware.sessions import SessionMiddleware
+
+from app.settings import settings
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="[%(levelname)s] %(name)s: %(message)s",
+)
+log = logging.getLogger(__name__)
+
+app = FastAPI(
+    title="Soundlist",
+    docs_url="/api/docs" if not settings.is_production else None,
+    redoc_url=None,
+)
+
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=settings.session_secret_key,
+    session_cookie="soundlist_session",
+    max_age=60 * 60 * 24 * 7,  # 7 days
+    https_only=settings.is_production,
+    same_site="lax",
+)
+
+
+@app.on_event("startup")
+async def on_startup() -> None:
+    """Run startup tasks."""
+    log.info("starting soundlist (env=%s)", settings.app_env)
+
+
+@app.get("/healthz", include_in_schema=False)
+async def healthcheck() -> JSONResponse:
+    """Return 200 when the app is alive."""
+    return JSONResponse({"status": "ok"})
