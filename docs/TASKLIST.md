@@ -3,7 +3,7 @@
 Ordered, each task is one commit-sized unit. Test before moving on.
 Maps to milestones M1-M6 in PLAN.md.
 
-Status: M1-M5 done, M6 T6.1-T6.3/T6.5 done (98 tests, ruff+pylint clean). Next: T6.4/T6.6 (README, deploy notes).
+Status: M1-M6 done. Stretch/debt items remain.
 
 ## M1 - Skeleton, DB, importer (JSON parity)
 
@@ -66,9 +66,9 @@ Status: M1-M5 done, M6 T6.1-T6.3/T6.5 done (98 tests, ruff+pylint clean). Next: 
 - [x] T6.2 (SHOULD) Grant/revoke admin flag.
 - [x] T6.3 Point public board `app.js` base path at the app's `/lists/*`;
       verify board works end-to-end unchanged otherwise.
-- [ ] T6.4 README: setup, env vars, `uv run`, import, deploy notes.
+- [x] T6.4 README: setup, env vars, `uv run`, import, deploy notes.
 - [x] T6.5 Lint/type pass: ruff + pylint clean, full type hints.
-- [ ] T6.6 Deploy notes: uvicorn behind reverse proxy, persistent SQLite
+- [x] T6.6 Deploy notes: uvicorn behind reverse proxy, persistent SQLite
       volume, env secrets.
 
 ## Stretch (LATER)

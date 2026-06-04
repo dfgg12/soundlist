@@ -43,6 +43,7 @@ API docs (dev only): http://localhost:8000/api/docs
 | `DATABASE_URL` | `sqlite:///./soundlist.db` | SQLite file path |
 | `APP_ENV` | `development` | Set to `production` for stricter cookie flags and no API docs |
 | `CSRF_ENABLED` | `true` | Set `false` to bypass CSRF (dev only) |
+| `ALLOW_SELF_REGISTER` | `true` | Let Twitch users create a channel for their own login from the dashboard |
 
 ## Running tests
 

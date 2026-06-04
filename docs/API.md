@@ -397,6 +397,67 @@ curl -X POST -b cookies.txt \
 
 ---
 
+#### `POST /library/{sound_id}/add`
+
+Wire a library sound to one of the user's channels as a new trigger.
+
+**Auth**: Required (owner of target channel, or admin)
+
+**Path Parameters**:
+- `sound_id` (integer) - Library Sound ID
+
+**Form Parameters**:
+- `channel_id` (integer, required) - Target channel ID
+- `trigger_word` (string, required) - Trigger word for the new entry
+- `csrf` (string, required) - CSRF protection
+
+**Response**: 302 Redirect to `/library`
+
+**Validation**:
+- `trigger_word` must be unique within the channel
+- User must own the channel or be admin
+
+**Errors**:
+- 403: Not owner or admin
+- 404: Sound or channel not found
+
+**Example**:
+```bash
+curl -X POST -b cookies.txt \
+  -F "channel_id=3" \
+  -F "trigger_word=meow" \
+  -F "csrf=<token>" \
+  http://localhost:8000/library/42/add
+```
+
+---
+
+### Dashboard Endpoints
+
+#### `POST /self-register`
+
+Create a channel for the current user using their Twitch login as the slug. Only available when `ALLOW_SELF_REGISTER=true` and the user has no channels yet.
+
+**Auth**: Required
+
+**Form Parameters**:
+- `csrf` (string, required) - CSRF protection
+
+**Response**: 302 Redirect to `/`
+
+**Errors**:
+- 403: Self-registration disabled (`ALLOW_SELF_REGISTER=false`)
+- 409 (flash): Channel with that slug already exists
+
+**Example**:
+```bash
+curl -X POST -b cookies.txt \
+  -F "csrf=<token>" \
+  http://localhost:8000/self-register
+```
+
+---
+
 ### Admin Endpoints
 
 #### `GET /admin`
