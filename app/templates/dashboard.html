@@ -8,7 +8,7 @@
   <a href="/login" class="btn btn-twitch">Login with Twitch</a>
 </div>
 {% elif channels %}
-<div class="card">
+<div class="card" id="user-card">
   <h2 style="margin-top:0">Your channels</h2>
   <ul style="list-style:none;padding:0">
     {% for ch in channels %}
@@ -21,7 +21,7 @@
   </ul>
 </div>
 {% else %}
-<div class="card">
+<div class="card" id="user-card">
   <p>No channels linked to your Twitch account (<strong>{{ user.login }}</strong>).</p>
 </div>
 {% endif %}
