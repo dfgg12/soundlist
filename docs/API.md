@@ -140,10 +140,10 @@ Sound editor for a specific channel.
 - `slug` (string) - Channel slug (e.g., "Amedoll")
 
 **Response**: HTML page with:
-- Table of current triggers
+- Table of current triggers with play-preview buttons
 - Form to add new trigger
-- Edit/delete buttons for each trigger
-- Test button to play sounds
+- Edit/delete/toggle buttons for each trigger
+- Live preview of the generated channel JSON
 
 **Example**:
 ```bash
@@ -169,13 +169,13 @@ Add a new trigger to a channel.
 
 **Form Parameters**:
 - `trigger_word` (string, required) - Word that triggers the sound
-- `sound_id` (integer, optional) - Link to existing library Sound
-- `sound_url` (string, optional) - Create new single-clip Sound
-- `sound_name` (string, optional) - Name for new Sound
-- `volume` (float, 0.0-1.0, optional) - Default: Sound.default_volume
+- `sound_mode` (string, required) - `"new"` to create a Sound, `"existing"` to link one
+- `sound_name` (string, optional) - Name for the Sound (new: used as name; existing: looked up by name)
+- `sound_url` (string, required if `sound_mode=new`) - Audio URL for new Sound
+- `volume` (float, 0.0-1.0, optional) - Per-trigger override; blank inherits Sound.default_volume
 - `chance` (string, optional) - Probability, e.g. "50%". Default: "100%"
 - `trigger_cooldown` (integer, optional) - Seconds between triggers. Default: 0
-- `csrf_token` (string, required) - CSRF protection
+- `csrf` (string, required) - CSRF protection
 
 **Response**: 302 Redirect to `/c/<slug>`
 
@@ -183,25 +183,24 @@ Add a new trigger to a channel.
 ```bash
 curl -X POST -b cookies.txt \
   -F "trigger_word=meow" \
+  -F "sound_mode=new" \
   -F "sound_url=https://example.com/meow.ogg" \
   -F "sound_name=Meow Sound" \
   -F "volume=0.7" \
-  -F "csrf_token=<token>" \
+  -F "csrf=<token>" \
   http://localhost:8000/c/Amedoll/sound
 ```
 
 **Validation**:
 - `trigger_word` must be unique per channel
-- Must provide either `sound_id` (existing) or both `sound_url` and `sound_name`
-- `volume` must be 0.0-1.0
-- `chance` must match pattern /^\d+%$/
+- `sound_mode=existing` requires a matching Sound name in the library
+- `sound_mode=new` requires `sound_url`; name defaults to `trigger_word` if blank
 - `trigger_cooldown` must be non-negative
 
 **Errors**:
-- 400: Validation error
 - 401: Not authenticated
 - 403: Not owner or admin
-- 409: Duplicate trigger_word for this channel
+- Flash error on duplicate trigger_word or missing URL (redirect, not 4xx)
 
 ---
 
@@ -217,11 +216,11 @@ Edit an existing trigger.
 
 **Form Parameters**:
 - `trigger_word` (string) - Updated trigger word
-- `volume` (float, 0.0-1.0) - Updated volume
+- `volume` (float, 0.0-1.0) - Updated volume (blank to inherit default)
 - `chance` (string) - Updated probability, e.g. "50%"
 - `trigger_cooldown` (integer) - Updated cooldown
-- `enabled` (checkbox) - "on" if enabled, absent if disabled
-- `csrf_token` (string) - CSRF protection
+- `enabled` (checkbox) - present if enabled, absent if disabled
+- `csrf` (string) - CSRF protection
 
 **Response**: 302 Redirect to `/c/<slug>`
 
@@ -236,7 +235,7 @@ curl -X POST -b cookies.txt \
   -F "trigger_word=meow_updated" \
   -F "volume=0.8" \
   -F "chance=75%" \
-  -F "csrf_token=<token>" \
+  -F "csrf=<token>" \
   http://localhost:8000/c/Amedoll/sound/123
 ```
 
@@ -253,7 +252,7 @@ Delete a trigger from a channel.
 - `id` (integer) - ChannelSound ID
 
 **Form Parameters**:
-- `csrf_token` (string) - CSRF protection
+- `csrf` (string) - CSRF protection
 
 **Response**: 302 Redirect to `/c/<slug>`
 
@@ -265,15 +264,39 @@ Delete a trigger from a channel.
 **Example**:
 ```bash
 curl -X POST -b cookies.txt \
-  -F "csrf_token=<token>" \
+  -F "csrf=<token>" \
   http://localhost:8000/c/Amedoll/sound/123/delete
+```
+
+---
+
+#### `GET /c/<slug>/validate`
+
+Check URL reachability and trigger-word uniqueness (used by in-page JS).
+
+**Auth**: Required (owner or admin)
+
+**Query Parameters**:
+- `url` (string, optional) - Audio URL to probe with HEAD request
+- `trigger_word` (string, optional) - Word to check for uniqueness in the channel
+- `exclude_id` (integer, optional) - ChannelSound ID to exclude from the uniqueness check (for edits)
+
+**Response**: JSON
+```json
+{"url_ok": true, "url_status": 200, "trigger_unique": true}
+```
+
+**Example**:
+```bash
+curl -b cookies.txt \
+  "http://localhost:8000/c/Amedoll/validate?url=https://example.com/meow.ogg&trigger_word=meow"
 ```
 
 ---
 
 #### `POST /c/<slug>/sound/<id>/toggle`
 
-Toggle enabled status without full edit.
+Toggle enabled flag on a trigger.
 
 **Auth**: Required (owner or admin)
 
@@ -281,39 +304,16 @@ Toggle enabled status without full edit.
 - `slug` (string) - Channel slug
 - `id` (integer) - ChannelSound ID
 
-**Response**: JSON
-```json
-{"enabled": true}
-```
+**Form Parameters**:
+- `csrf` (string) - CSRF protection
+
+**Response**: 302 Redirect to `/c/<slug>`
 
 **Example**:
 ```bash
 curl -X POST -b cookies.txt \
+  -F "csrf=<token>" \
   http://localhost:8000/c/Amedoll/sound/123/toggle
-# Returns: {"enabled": false}
-```
-
----
-
-#### `GET /c/<slug>/test`
-
-Testing and preview view for a channel.
-
-**Auth**: Required (owner or admin)
-
-**Path Parameters**:
-- `slug` (string) - Channel slug
-
-**Response**: HTML page with:
-- List of all triggers
-- Play buttons for testing sounds
-- Live preview of generated JSON
-- Volume slider for testing
-
-**Example**:
-```bash
-curl -b cookies.txt http://localhost:8000/c/Amedoll/test
-# Returns: HTML test page
 ```
 
 ---
@@ -352,10 +352,10 @@ Create a new sound asset in the library.
 **Form Parameters**:
 - `name` (string, required) - Unique name for the sound
 - `default_volume` (float, 0.0-1.0, optional) - Default: 0.5
-- `sound_type` (string, required) - "single" or "multi"
+- `is_random` (checkbox, optional) - Present for a multi-clip random asset; absent for single-clip
 - For single-clip: `url` (string) - Audio URL
-- For multi-clip: `clips[0][url]`, `clips[0][volume]`, `clips[0][chance]`, etc.
-- `csrf_token` (string) - CSRF protection
+- For multi-clip: `clip_url[]`, `clip_volume[]`, `clip_chance[]` (parallel lists, one entry per clip)
+- `csrf` (string) - CSRF protection
 
 **Response**: 302 Redirect to `/library`
 
@@ -364,36 +364,34 @@ Create a new sound asset in the library.
 curl -X POST -b cookies.txt \
   -F "name=Meow Sound" \
   -F "default_volume=0.7" \
-  -F "sound_type=single" \
   -F "url=https://example.com/meow.ogg" \
-  -F "csrf_token=<token>" \
+  -F "csrf=<token>" \
   http://localhost:8000/library
 ```
 
-**Example (multi-clip)**:
+**Example (multi-clip random)**:
 ```bash
 curl -X POST -b cookies.txt \
   -F "name=Groan Sounds" \
   -F "default_volume=0.6" \
-  -F "sound_type=multi" \
-  -F "clips[0][url]=https://example.com/groan1.ogg" \
-  -F "clips[0][volume]=1.0" \
-  -F "clips[0][chance]=50%" \
-  -F "clips[1][url]=https://example.com/groan2.ogg" \
-  -F "clips[1][volume]=0.8" \
-  -F "clips[1][chance]=50%" \
-  -F "csrf_token=<token>" \
+  -F "is_random=on" \
+  -F "clip_url=https://example.com/groan1.ogg" \
+  -F "clip_volume=1.0" \
+  -F "clip_chance=50%" \
+  -F "clip_url=https://example.com/groan2.ogg" \
+  -F "clip_volume=0.8" \
+  -F "clip_chance=50%" \
+  -F "csrf=<token>" \
   http://localhost:8000/library
 ```
 
 **Validation**:
-- `name` must be unique
-- At least one clip required for multi-clip
-- All clips need URL and chance
+- `name` must be unique across the library
+- At least one clip URL required for random assets
+- Single assets require `url`
 
 **Errors**:
-- 400: Validation error
-- 409: Sound name already exists
+- Flash error on validation failure (redirect, not 4xx)
 
 ---
 
@@ -449,6 +447,9 @@ Create a channel for the current user using their Twitch login as the slug. Only
 - 403: Self-registration disabled (`ALLOW_SELF_REGISTER=false`)
 - 409 (flash): Channel with that slug already exists
 
+**Form Parameters**:
+- `csrf` (string) - CSRF protection
+
 **Example**:
 ```bash
 curl -X POST -b cookies.txt \
@@ -467,10 +468,10 @@ Admin panel for managing channels and users.
 **Auth**: Required (admin only)
 
 **Response**: HTML page with:
-- List of all channels
-- Owner assignment controls
-- Admin toggle switches for users
+- List of all users with admin toggle
+- List of all channels with owner assignment
 - Create channel form
+- Refresh avatars button
 
 **Errors**:
 - 403: User is not admin
@@ -482,63 +483,106 @@ curl -b cookies.txt http://localhost:8000/admin
 
 ---
 
-#### `POST /admin/channel`
+#### `POST /admin/channel/create`
 
 Create a new channel.
 
 **Auth**: Required (admin only)
 
 **Form Parameters**:
-- `slug` (string, required) - Unique channel slug
-- `display_name` (string, required) - Display name
-- `owner_id` (integer, optional) - User ID to assign as owner
-- `is_sub_board` (checkbox, optional) - "on" if sub-board
-- `csrf_token` (string) - CSRF protection
+- `slug` (string, required) - Unique channel slug (lowercased)
+- `display_name` (string, optional) - Display name; defaults to slug
+- `owner_login` (string, optional) - Twitch login of owner to assign
+- `csrf` (string) - CSRF protection
 
 **Response**: 302 Redirect to `/admin`
 
 **Example**:
 ```bash
 curl -X POST -b cookies.txt \
-  -F "slug=NewStreamer" \
+  -F "slug=newstreamer" \
   -F "display_name=New Streamer" \
-  -F "csrf_token=<token>" \
-  http://localhost:8000/admin/channel
+  -F "owner_login=newstreamer" \
+  -F "csrf=<token>" \
+  http://localhost:8000/admin/channel/create
 ```
 
 ---
 
-#### `POST /admin/channel/<id>/owner`
+#### `POST /admin/channel/<slug>/assign`
 
-Reassign channel owner.
+Assign (or unassign) a channel owner.
 
 **Auth**: Required (admin only)
 
 **Path Parameters**:
-- `id` (integer) - Channel ID
+- `slug` (string) - Channel slug
 
 **Form Parameters**:
-- `owner_id` (integer, optional) - New owner User ID (or None to unassign)
-- `csrf_token` (string) - CSRF protection
+- `owner_login` (string, optional) - Twitch login of new owner; blank to unassign
+- `csrf` (string) - CSRF protection
+
+**Response**: 302 Redirect to `/admin`
+
+**Example**:
+```bash
+curl -X POST -b cookies.txt \
+  -F "owner_login=someuser" \
+  -F "csrf=<token>" \
+  http://localhost:8000/admin/channel/newstreamer/assign
+```
+
+---
+
+#### `POST /admin/channel/<slug>/delete`
+
+Delete a channel and all its triggers.
+
+**Auth**: Required (admin only)
+
+**Path Parameters**:
+- `slug` (string) - Channel slug
+
+**Form Parameters**:
+- `csrf` (string) - CSRF protection
 
 **Response**: 302 Redirect to `/admin`
 
 ---
 
-#### `POST /admin/user/<id>/admin`
+#### `POST /admin/user/<login>/toggle-admin`
 
-Grant or revoke admin privileges.
+Grant or revoke admin flag for a user.
 
 **Auth**: Required (admin only)
 
 **Path Parameters**:
-- `id` (integer) - User ID
+- `login` (string) - Twitch login of target user
 
 **Form Parameters**:
-- `is_admin` (checkbox, optional) - "on" to grant, absent to revoke
-- `csrf_token` (string) - CSRF protection
+- `csrf` (string) - CSRF protection
+
+**Notes**:
+- Admins cannot demote themselves
 
 **Response**: 302 Redirect to `/admin`
+
+---
+
+#### `POST /admin/refresh-avatars`
+
+Fetch current Twitch avatars for all channels using app credentials.
+
+**Auth**: Required (admin only)
+
+**Form Parameters**:
+- `csrf` (string) - CSRF protection
+
+**Response**: 302 Redirect to `/admin`
+
+**Notes**:
+- Calls Twitch helix/users in batches of 100
+- Updates `avatar_url` on all matching channels
 
 ---
 

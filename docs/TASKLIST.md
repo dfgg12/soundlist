@@ -93,9 +93,8 @@ Status: M1-M6 done. Stretch/debt items remain.
 - [ ] D4 Endpoint handlers exceed pylint `max-args=8` (FastAPI Form/Depends
       idiom). Either bump the design limit for route modules or fold form
       fields into a Pydantic model bound via `Depends`. Decide, document.
-- [ ] D5 T6.5 lint pass partly done: ruff clean, 79-col enforced, deprecated
-      `on_event` -> lifespan. Remaining: pylint clean run in the venv (not
-      system Python) and resolve `func.count` false positive.
+- [x] D5 T6.5 lint pass complete: ruff + pylint 10.00/10, 79-col enforced,
+      `on_event` -> lifespan, `func.count` false positive suppressed inline.
 
 ## Definition of done per task
 

@@ -215,14 +215,16 @@ async def channel_editor(
     if random_sound_ids:
         clip_rows = session.exec(
             select(SoundClip).where(
-                SoundClip.sound_id.in_(random_sound_ids)  # type: ignore[attr-defined]
+                SoundClip.sound_id.in_(  # type: ignore[attr-defined]
+                    random_sound_ids
+                )
             )
         ).all()
         for clip in clip_rows:
             sound_clips.setdefault(clip.sound_id, []).append(
                 {"url": clip.url, "volume": clip.volume, "chance": clip.chance}
             )
-    # Build preview data keyed by ChannelSound.id (consumed by JS, safe in script block)
+    # Build preview data keyed by ChannelSound.id for JS
     preview_items: dict[int, dict] = {}
     for cs in channel_sounds:
         if cs.sound is None:
