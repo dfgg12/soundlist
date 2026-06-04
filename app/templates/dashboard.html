@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Dashboard - Soundlist{% endblock %}
+{% block content %}
+<h1>Dashboard</h1>
+{% if not user %}
+<div class="card">
+  <p style="margin-bottom:.75rem">Log in with Twitch to manage your soundboard.</p>
+  <a href="/login" class="btn btn-twitch">Login with Twitch</a>
+</div>
+{% elif channels %}
+<div class="card">
+  <h2 style="margin-top:0">Your channels</h2>
+  <ul style="list-style:none;padding:0">
+    {% for ch in channels %}
+    <li style="padding:.35rem 0;border-top:1px solid #ebebf0{% if loop.first %};border-top:none{% endif %}">
+      {% if ch.avatar_url %}<img src="{{ ch.avatar_url }}" style="width:22px;height:22px;border-radius:50%;vertical-align:middle;margin-right:.4rem">{% endif %}
+      <a href="/c/{{ ch.slug }}">{{ ch.display_name or ch.slug }}</a>
+      {% if ch.is_sub_board %}<span class="badge badge-off">sub</span>{% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+</div>
+{% else %}
+<div class="card">
+  <p>No channels linked to your Twitch account (<strong>{{ user.login }}</strong>).</p>
+</div>
+{% endif %}
+{% endblock %}

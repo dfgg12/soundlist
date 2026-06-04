@@ -13,6 +13,7 @@ from app.auth import router as auth_router
 from app.auth import seed_admins
 from app.db import create_db_and_tables
 from app.lists import router as lists_router
+from app.panel import router as panel_router
 from app.settings import settings
 
 logging.basicConfig(
@@ -29,6 +30,7 @@ app = FastAPI(
 
 app.include_router(auth_router)
 app.include_router(lists_router)
+app.include_router(panel_router)
 
 app.add_middleware(
     SessionMiddleware,

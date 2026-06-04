@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+{% block title %}{{ channel.display_name or channel.slug }} - Soundlist{% endblock %}
+{% block content %}
+<div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.9rem">
+  {% if channel.avatar_url %}<img src="{{ channel.avatar_url }}" style="width:36px;height:36px;border-radius:50%">{% endif %}
+  <h1 style="margin:0">{{ channel.display_name or channel.slug }}</h1>
+  <a href="/lists/{{ channel.slug }}.json" target="_blank" style="font-size:12px;color:#7c3aed;margin-left:.5rem">[ JSON ]</a>
+</div>
+
+<h2>Triggers ({{ channel_sounds | length }})</h2>
+
+<table>
+<thead>
+<tr>
+  <th>Trigger</th>
+  <th>Sound</th>
+  <th>Volume</th>
+  <th>Chance</th>
+  <th>Cooldown</th>
+  <th>Enabled</th>
+  <th>Actions</th>
+</tr>
+</thead>
+<tbody>
+{% for cs in channel_sounds %}
+<tr>
+  <td>
+    <input type="text" name="trigger_word" value="{{ cs.trigger_word }}"
+           form="edit-{{ cs.id }}" style="width:130px">
+  </td>
+  <td style="color:#555;font-size:12px">{{ cs.sound.name if cs.sound else '?' }}</td>
+  <td>
+    <input type="number" name="volume"
+           value="{{ cs.volume if cs.volume is not none else '' }}"
+           form="edit-{{ cs.id }}" min="0" max="1" step="0.05"
+           style="width:68px" placeholder="dflt">
+  </td>
+  <td>
+    <input type="text" name="chance" value="{{ cs.chance }}"
+           form="edit-{{ cs.id }}" style="width:58px">
+  </td>
+  <td>
+    <input type="number" name="trigger_cooldown" value="{{ cs.trigger_cooldown }}"
+           form="edit-{{ cs.id }}" min="0" style="width:60px">
+  </td>
+  <td>
+    <input type="checkbox" name="enabled" value="on"
+           {% if cs.enabled %}checked{% endif %}
+           form="edit-{{ cs.id }}">
+  </td>
+  <td style="white-space:nowrap">
+    <button type="submit" form="edit-{{ cs.id }}" class="btn btn-primary btn-sm"
+            style="padding:.2rem .55rem;font-size:12px">Save</button>
+    <button type="submit" form="delete-{{ cs.id }}" class="btn btn-danger btn-sm"
+            style="padding:.2rem .55rem;font-size:12px"
+            onclick="return confirm('Delete trigger \'{{ cs.trigger_word }}\'?')">Del</button>
+  </td>
+</tr>
+
+{# Hidden forms: one per action per row #}
+<form id="edit-{{ cs.id }}" method="post"
+      action="/c/{{ channel.slug }}/sound/{{ cs.id }}" style="display:none">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+</form>
+<form id="delete-{{ cs.id }}" method="post"
+      action="/c/{{ channel.slug }}/sound/{{ cs.id }}/delete" style="display:none">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+</form>
+{% else %}
+<tr><td colspan="7" style="color:#888;padding:.75rem">No triggers yet.</td></tr>
+{% endfor %}
+</tbody>
+</table>
+
+{# --- Add trigger form (T3.4) --- #}
+<h2>Add trigger</h2>
+<div class="card">
+  <form method="post" action="/c/{{ channel.slug }}/sound">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <div style="display:flex;flex-wrap:wrap;gap:.75rem;align-items:flex-end">
+
+      <div>
+        <label style="display:block;font-size:12px;margin-bottom:.2rem">Trigger word *</label>
+        <input type="text" name="trigger_word" required style="width:140px"
+               placeholder="e.g. !bruh">
+      </div>
+
+      <div>
+        <label style="display:block;font-size:12px;margin-bottom:.2rem">Sound source</label>
+        <select name="sound_mode" id="sound_mode"
+                onchange="toggleSoundMode(this.value)" style="width:140px">
+          <option value="new">New sound</option>
+          <option value="existing">Existing sound</option>
+        </select>
+      </div>
+
+      <div id="new_sound_fields" style="display:flex;gap:.5rem;flex-wrap:wrap">
+        <div>
+          <label style="display:block;font-size:12px;margin-bottom:.2rem">Sound name</label>
+          <input type="text" name="sound_name" style="width:140px"
+                 placeholder="optional, defaults to trigger">
+        </div>
+        <div>
+          <label style="display:block;font-size:12px;margin-bottom:.2rem">URL *</label>
+          <input type="url" name="sound_url" style="width:230px"
+                 placeholder="https://...">
+        </div>
+      </div>
+
+      <div id="existing_sound_field" style="display:none">
+        <label style="display:block;font-size:12px;margin-bottom:.2rem">Sound</label>
+        <select name="sound_id" style="width:220px">
+          <option value="">-- select --</option>
+          {% for s in sounds %}
+          <option value="{{ s.id }}">{{ s.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div>
+        <label style="display:block;font-size:12px;margin-bottom:.2rem">Volume</label>
+        <input type="number" name="volume" min="0" max="1" step="0.05"
+               style="width:70px" placeholder="dflt">
+      </div>
+
+      <div>
+        <label style="display:block;font-size:12px;margin-bottom:.2rem">Chance</label>
+        <input type="text" name="chance" value="100%" style="width:65px">
+      </div>
+
+      <div>
+        <label style="display:block;font-size:12px;margin-bottom:.2rem">Cooldown (s)</label>
+        <input type="number" name="trigger_cooldown" value="0" min="0"
+               style="width:68px">
+      </div>
+
+      <div>
+        <button type="submit" class="btn btn-primary">Add trigger</button>
+      </div>
+    </div>
+  </form>
+</div>
+
+<script>
+function toggleSoundMode(mode) {
+  document.getElementById('new_sound_fields').style.display =
+    mode === 'new' ? 'flex' : 'none';
+  document.getElementById('existing_sound_field').style.display =
+    mode === 'existing' ? '' : 'none';
+}
+</script>
+{% endblock %}
