@@ -26,6 +26,8 @@ oauth.register(
     client_secret=settings.twitch_client_secret,
     authorize_url="https://id.twitch.tv/oauth2/authorize",
     access_token_url="https://id.twitch.tv/oauth2/token",
+    # Twitch requires credentials as body params, not HTTP Basic auth
+    token_endpoint_auth_method="client_secret_post",
     client_kwargs={"scope": "user:read:email"},
 )
 
@@ -112,7 +114,10 @@ async def auth_callback(
         raise HTTPException(status_code=400, detail="OAuth failed") from exc
     access_token = token.get("access_token")
     if not access_token:
-        log.error("token dict missing access_token: %s", list(token.keys()))
+        log.error(
+            "token dict missing access_token - twitch said: %s",
+            token.get("message", token),
+        )
         raise HTTPException(status_code=502, detail="No access token from Twitch")
     try:
         twitch_data = await _fetch_twitch_user(access_token)
