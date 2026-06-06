@@ -75,7 +75,7 @@ Status: M1-M6 done. Stretch/debt items remain.
 
 - [ ] S1 Audio upload to R2 (presigned PUT) instead of URL paste.
 - [ ] S2 Admin CRUD for avatars and emote icon triggers.
-- [ ] S3 Reorder triggers via drag (position field already in model).
+- [x] S3 Reorder triggers via drag (position field already in model).
 - [ ] S4 Alembic migrations once schema stabilizes.
 
 ## Tech debt / follow-ups (from M1-M4 code review)
