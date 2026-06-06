@@ -17,6 +17,7 @@
 <table>
 <thead>
 <tr>
+  <th style="width:22px"></th>
   <th>Trigger</th>
   <th>Sound</th>
   <th>Volume</th>
@@ -26,9 +27,11 @@
   <th>Actions</th>
 </tr>
 </thead>
-<tbody>
+<tbody id="triggers-tbody">
 {% for cs in channel_sounds %}
-<tr{% if not cs.enabled %} style="opacity:.45"{% endif %}>
+<tr data-cs-id="{{ cs.id }}"{% if not cs.enabled %} style="opacity:.45"{% endif %}>
+  <td style="cursor:grab;color:#aaa;text-align:center;font-size:16px;user-select:none"
+      class="drag-handle" title="Drag to reorder">&#8597;</td>
   <td>
     <input type="text" name="trigger_word" value="{{ cs.trigger_word }}"
            form="edit-{{ cs.id }}" style="width:130px" list="trigger-hints">
@@ -83,7 +86,7 @@
   <input type="hidden" name="csrf" value="{{ csrf }}">
 </form>
 {% else %}
-<tr><td colspan="7" style="color:#888;padding:.75rem">No triggers yet.</td></tr>
+<tr><td colspan="8" style="color:#888;padding:.75rem">No triggers yet.</td></tr>
 {% endfor %}
 </tbody>
 </table>
@@ -316,5 +319,77 @@ function toggleJson() {
   if (el.style.display === 'none') { el.style.display = ''; btn.textContent = 'Hide'; }
   else { el.style.display = 'none'; btn.textContent = 'Show'; }
 }
+
+// --- Drag-to-reorder (S3) ---
+(function() {
+  var tbody = document.getElementById('triggers-tbody');
+  if (!tbody) return;
+  var dragging = null;
+
+  function rowsWithId() {
+    return Array.from(tbody.querySelectorAll('tr[data-cs-id]'));
+  }
+
+  tbody.addEventListener('dragstart', function(e) {
+    var row = e.target.closest('tr[data-cs-id]');
+    if (!row) return;
+    dragging = row;
+    row.style.opacity = '0.4';
+    e.dataTransfer.effectAllowed = 'move';
+  });
+
+  tbody.addEventListener('dragend', function(e) {
+    var row = e.target.closest('tr[data-cs-id]');
+    if (row) row.style.opacity = '';
+    dragging = null;
+    rowsWithId().forEach(function(r) { r.classList.remove('drag-over'); });
+  });
+
+  tbody.addEventListener('dragover', function(e) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    var target = e.target.closest('tr[data-cs-id]');
+    if (!target || target === dragging) return;
+    rowsWithId().forEach(function(r) { r.classList.remove('drag-over'); });
+    target.classList.add('drag-over');
+    var rect = target.getBoundingClientRect();
+    var mid = rect.top + rect.height / 2;
+    if (e.clientY < mid) {
+      tbody.insertBefore(dragging, target);
+    } else {
+      tbody.insertBefore(dragging, target.nextSibling);
+    }
+  });
+
+  tbody.addEventListener('drop', function(e) {
+    e.preventDefault();
+    if (!dragging) return;
+    var order = rowsWithId().map(function(r) {
+      return parseInt(r.getAttribute('data-cs-id'), 10);
+    });
+    fetch('/c/{{ channel.slug }}/reorder', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({order: order, csrf: '{{ csrf }}'})
+    }).then(function(r) {
+      if (!r.ok) r.text().then(function(t) { console.error('reorder failed', t); });
+    }).catch(function(err) { console.error('reorder error', err); });
+  });
+
+  // Only handle drag from the handle cell
+  tbody.addEventListener('mousedown', function(e) {
+    var handle = e.target.closest('.drag-handle');
+    var row = handle && handle.closest('tr[data-cs-id]');
+    if (row) {
+      row.setAttribute('draggable', 'true');
+    }
+  });
+  tbody.addEventListener('mouseup', function() {
+    rowsWithId().forEach(function(r) { r.removeAttribute('draggable'); });
+  });
+})();
 </script>
+<style>
+tr.drag-over { outline: 2px solid #7c3aed; }
+</style>
 {% endblock %}

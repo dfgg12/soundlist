@@ -8,8 +8,13 @@ from pathlib import Path
 
 import httpx
 from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import (
+    HTMLResponse,
+    JSONResponse,
+    RedirectResponse,
+)
 from fastapi.templating import Jinja2Templates
+from pydantic import BaseModel
 from sqlalchemy import func
 from sqlalchemy.orm import selectinload
 from sqlmodel import Session, col, select
@@ -523,3 +528,43 @@ async def toggle_sound(
     state = "enabled" if cs.enabled else "disabled"
     flash(request, f"Trigger '{cs.trigger_word}' {state}.", "success")
     return RedirectResponse(f"/c/{slug}", status_code=303)
+
+
+# ---------------------------------------------------------------------------
+# Reorder triggers (S3)
+# ---------------------------------------------------------------------------
+
+
+class _ReorderBody(BaseModel):
+    """Payload for drag-to-reorder: ordered list of ChannelSound IDs."""
+
+    order: list[int]
+    csrf: str
+
+
+@router.post("/c/{slug}/reorder", response_class=JSONResponse)
+async def reorder_sounds(
+    slug: str,
+    body: _ReorderBody,
+    request: Request,
+    session: Session = Depends(get_session),
+    user: User = Depends(require_user),
+    channel: Channel = Depends(require_channel_access),
+) -> JSONResponse:
+    """Persist new trigger order sent as an ordered list of IDs."""
+    require_csrf(request, body.csrf)
+    rows = list(
+        session.exec(
+            select(ChannelSound).where(
+                ChannelSound.channel_id == channel.id
+            )
+        ).all()
+    )
+    by_id = {r.id: r for r in rows}
+    if set(body.order) != set(by_id.keys()):
+        raise HTTPException(status_code=400, detail="ID set mismatch")
+    for pos, cs_id in enumerate(body.order):
+        by_id[cs_id].position = pos
+        session.add(by_id[cs_id])
+    session.commit()
+    return JSONResponse({"ok": True})
