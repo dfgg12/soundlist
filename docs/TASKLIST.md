@@ -80,19 +80,17 @@ Status: M1-M6 done. Stretch/debt items remain.
 
 ## Tech debt / follow-ups (from M1-M4 code review)
 
-- [ ] D1 Type-checker gate: add pyright (or mypy) to dev deps + CI so the
-      scattered `# type: ignore[...]` on SQLModel columns are verified,
-      not decorative. Then replace column-attr ignores with sqlmodel
-      `col()` where it reads cleaner (`col(ChannelSound.sound_id).in_(...)`).
-- [ ] D2 Starlette `TestClient` emits a deprecation warning (httpx vs
-      httpx2). Pin/upgrade test stack to silence; add `filterwarnings`
-      in pytest config so new deprecations fail loudly.
-- [ ] D3 `created_at` is now tz-aware (`datetime.now(UTC)`). If any future
-      query/sort needs it, declare the column `DateTime(timezone=True)`
-      so SQLite round-trips the offset; currently stored as naive string.
-- [ ] D4 Endpoint handlers exceed pylint `max-args=8` (FastAPI Form/Depends
-      idiom). Either bump the design limit for route modules or fold form
-      fields into a Pydantic model bound via `Depends`. Decide, document.
+- [x] D1 pyright added to dev deps; all col-attr `type: ignore` replaced
+      with `col()` in panel, library, auth. selectinload arg-type kept
+      (SQLModel relationship type-stub limitation, not a column attr).
+- [x] D2 httpx2 added to dev deps (silences StarletteDeprecationWarning);
+      `filterwarnings = ["error", ignore::StarletteDeprecationWarning]`
+      in pytest config so future deprecations fail loudly.
+- [x] D3 All `created_at` fields now use `DateTime(timezone=True)` so
+      SQLite stores and round-trips the UTC offset correctly.
+- [x] D4 Form fields folded into `_AddSoundForm`, `_EditSoundForm`,
+      `_CreateAssetForm`, `_EditAssetForm` bound via `Depends()`.
+      `max-args` reverted from 15 to 9 (form DI class init ceiling).
 - [x] D5 T6.5 lint pass complete: ruff + pylint 10.00/10, 79-col enforced,
       `on_event` -> lifespan, `func.count` false positive suppressed inline.
 
