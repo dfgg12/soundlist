@@ -12,7 +12,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import func
 from sqlalchemy.orm import selectinload
-from sqlmodel import Session, select
+from sqlmodel import Session, col, select
 
 from app.auth import current_user, require_channel_access, require_user
 from app.csrf import csrf_token, require_csrf
@@ -30,6 +30,50 @@ templates = Jinja2Templates(
 
 
 _ADD_FORM_KEY = "add_form"
+
+
+class _AddSoundForm:
+    """Bundled form fields for the add-trigger endpoint."""
+
+    def __init__(
+        self,
+        trigger_word: str = Form(...),
+        sound_mode: str = Form("new"),
+        sound_name: str = Form(""),
+        sound_url: str = Form(""),
+        volume: str = Form(""),
+        chance: str = Form("100%"),
+        trigger_cooldown: int = Form(0),
+        csrf: str = Form(...),
+    ) -> None:
+        self.trigger_word = trigger_word
+        self.sound_mode = sound_mode
+        self.sound_name = sound_name
+        self.sound_url = sound_url
+        self.volume = volume
+        self.chance = chance
+        self.trigger_cooldown = trigger_cooldown
+        self.csrf = csrf
+
+
+class _EditSoundForm:
+    """Bundled form fields for the edit-trigger endpoint."""
+
+    def __init__(
+        self,
+        trigger_word: str = Form(...),
+        volume: str = Form(""),
+        chance: str = Form("100%"),
+        trigger_cooldown: int = Form(0),
+        enabled: str | None = Form(None),
+        csrf: str = Form(...),
+    ) -> None:
+        self.trigger_word = trigger_word
+        self.volume = volume
+        self.chance = chance
+        self.trigger_cooldown = trigger_cooldown
+        self.enabled = enabled
+        self.csrf = csrf
 
 
 def _stash_form(request: Request, **fields: str | int) -> None:
@@ -215,9 +259,7 @@ async def channel_editor(
     if random_sound_ids:
         clip_rows = session.exec(
             select(SoundClip).where(
-                SoundClip.sound_id.in_(  # type: ignore[attr-defined]
-                    random_sound_ids
-                )
+                col(SoundClip.sound_id).in_(random_sound_ids)
             )
         ).all()
         for clip in clip_rows:
@@ -290,33 +332,26 @@ async def add_sound(
     session: Session = Depends(get_session),
     user: User = Depends(require_user),
     channel: Channel = Depends(require_channel_access),
-    trigger_word: str = Form(...),
-    sound_mode: str = Form("new"),
-    sound_name: str = Form(""),
-    sound_url: str = Form(""),
-    volume: str = Form(""),
-    chance: str = Form("100%"),
-    trigger_cooldown: int = Form(0),
-    csrf: str = Form(...),
+    form: _AddSoundForm = Depends(),
 ) -> RedirectResponse:
     """Add a new trigger to the channel, creating or linking a Sound."""
-    require_csrf(request, csrf)
+    require_csrf(request, form.csrf)
 
     def _err(msg: str) -> RedirectResponse:
         _stash_form(
             request,
-            trigger_word=trigger_word,
-            sound_mode=sound_mode,
-            sound_name=sound_name,
-            sound_url=sound_url,
-            volume=volume,
-            chance=chance,
-            trigger_cooldown=trigger_cooldown,
+            trigger_word=form.trigger_word,
+            sound_mode=form.sound_mode,
+            sound_name=form.sound_name,
+            sound_url=form.sound_url,
+            volume=form.volume,
+            chance=form.chance,
+            trigger_cooldown=form.trigger_cooldown,
         )
         flash(request, msg, "error")
         return RedirectResponse(f"/c/{slug}", status_code=303)
 
-    trigger_word = trigger_word.strip()
+    trigger_word = form.trigger_word.strip()
     if not trigger_word:
         return _err("Trigger word is required.")
     dup = session.exec(
@@ -328,7 +363,8 @@ async def add_sound(
     if dup:
         return _err(f"Trigger '{trigger_word}' already exists.")
     result = _resolve_sound(
-        session, sound_mode, sound_name, sound_url, trigger_word, user
+        session, form.sound_mode, form.sound_name, form.sound_url,
+        trigger_word, user,
     )
     if isinstance(result, str):
         return _err(result)
@@ -337,9 +373,9 @@ async def add_sound(
         channel_id=channel.id,
         sound_id=sound.id,
         trigger_word=trigger_word,
-        volume=_parse_volume(volume),
-        chance=chance.strip() or "100%",
-        trigger_cooldown=trigger_cooldown,
+        volume=_parse_volume(form.volume),
+        chance=form.chance.strip() or "100%",
+        trigger_cooldown=form.trigger_cooldown,
         enabled=True,
         position=_next_position(session, channel.id),
     )
@@ -362,19 +398,14 @@ async def edit_sound(
     session: Session = Depends(get_session),
     user: User = Depends(require_user),
     channel: Channel = Depends(require_channel_access),
-    trigger_word: str = Form(...),
-    volume: str = Form(""),
-    chance: str = Form("100%"),
-    trigger_cooldown: int = Form(0),
-    enabled: str | None = Form(None),
-    csrf: str = Form(...),
+    form: _EditSoundForm = Depends(),
 ) -> RedirectResponse:
     """Update trigger word and settings for an existing trigger."""
-    require_csrf(request, csrf)
+    require_csrf(request, form.csrf)
     cs = session.get(ChannelSound, cs_id)
     if not cs or cs.channel_id != channel.id:
         raise HTTPException(status_code=404, detail="Trigger not found")
-    trigger_word = trigger_word.strip()
+    trigger_word = form.trigger_word.strip()
     if not trigger_word:
         flash(request, "Trigger word cannot be empty.", "error")
         return RedirectResponse(f"/c/{slug}", status_code=303)
@@ -394,10 +425,10 @@ async def edit_sound(
             )
             return RedirectResponse(f"/c/{slug}", status_code=303)
     cs.trigger_word = trigger_word
-    cs.volume = _parse_volume(volume)
-    cs.chance = chance.strip() or "100%"
-    cs.trigger_cooldown = trigger_cooldown
-    cs.enabled = enabled is not None
+    cs.volume = _parse_volume(form.volume)
+    cs.chance = form.chance.strip() or "100%"
+    cs.trigger_cooldown = form.trigger_cooldown
+    cs.enabled = form.enabled is not None
     session.add(cs)
     session.commit()
     flash(request, f"Saved '{trigger_word}'.", "success")

@@ -420,21 +420,20 @@ def test_delete_sound_404_for_wrong_channel(
 
 
 # ---------------------------------------------------------------------------
-# Test / audition view (T5.1, T5.2)
+# Preview / audition (T5.1, T5.2) - merged into channel editor
 # ---------------------------------------------------------------------------
 
 
-def test_channel_test_page_renders(client, session, test_channel):
+def test_channel_editor_shows_trigger_word(client, session, test_channel):
     cs = _make_cs(session, test_channel)
-    resp = client.get("/c/testchan/test")
+    resp = client.get("/c/testchan")
     assert resp.status_code == 200
-    assert b"TEST MODE" in resp.content
     assert cs.trigger_word.encode() in resp.content
 
 
-def test_channel_test_page_contains_json(client, session, test_channel):
+def test_channel_editor_embeds_channel_json(client, session, test_channel):
     _make_cs(session, test_channel)
-    resp = client.get("/c/testchan/test")
+    resp = client.get("/c/testchan")
     assert resp.status_code == 200
     assert b'"sounds"' in resp.content
 

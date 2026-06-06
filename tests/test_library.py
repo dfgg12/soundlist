@@ -96,7 +96,8 @@ def test_library_shows_usage_count(client, session):
     _link(session, "chan1", sound)
     resp = client.get("/library")
     assert resp.status_code == 200
-    assert b"In use by 1 channel" in resp.content
+    # count column renders the numeric usage count
+    assert b'style="text-align:center">1<' in resp.content
 
 
 # ---------------------------------------------------------------------------

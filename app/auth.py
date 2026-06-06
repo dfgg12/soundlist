@@ -9,7 +9,7 @@ from authlib.integrations.starlette_client import OAuth, OAuthError
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from sqlalchemy import func
-from sqlmodel import Session, select
+from sqlmodel import Session, col, select
 
 from app.db import engine, get_session
 from app.models import Channel, User
@@ -108,7 +108,7 @@ def _claim_channels(session: Session, user: User) -> None:
     """Assign owner_id on unowned channels whose slug matches user login."""
     unclaimed = session.exec(
         select(Channel).where(
-            Channel.owner_id.is_(None),  # type: ignore[union-attr]
+            col(Channel.owner_id).is_(None),
             func.lower(Channel.slug) == user.login,
         )
     ).all()
@@ -212,9 +212,7 @@ def seed_admins() -> None:
         return
     with Session(engine) as session:
         users = session.exec(
-            select(User).where(  # type: ignore[attr-defined]
-                User.login.in_(logins)
-            )
+            select(User).where(col(User.login).in_(logins))
         ).all()
         for user in users:
             if not user.is_admin:

@@ -7,15 +7,9 @@ from sqlmodel import Session, SQLModel, create_engine
 import app.models  # noqa: F401  # pylint: disable=unused-import
 from app.settings import settings
 
-_connect_args = (
-    {"check_same_thread": False}
-    if settings.database_url.startswith("sqlite")
-    else {}
-)
-
 engine = create_engine(
     settings.database_url,
-    connect_args=_connect_args,
+    connect_args={"check_same_thread": False},
     echo=not settings.is_production,
 )
 

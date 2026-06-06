@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import func
-from sqlmodel import Session, select
+from sqlmodel import Session, col, select
 
 from app.auth import require_user
 from app.csrf import csrf_token, require_csrf
@@ -22,6 +22,52 @@ router = APIRouter()
 templates = Jinja2Templates(
     directory=str(Path(__file__).parent / "templates")
 )
+
+
+class _CreateAssetForm:
+    """Bundled form fields for the create-asset endpoint."""
+
+    def __init__(
+        self,
+        name: str = Form(...),
+        is_random: str | None = Form(None),
+        default_volume: str = Form(""),
+        url: str = Form(""),
+        clip_url: list[str] = Form([]),
+        clip_volume: list[str] = Form([]),
+        clip_chance: list[str] = Form([]),
+        csrf: str = Form(...),
+    ) -> None:
+        self.name = name
+        self.is_random = is_random
+        self.default_volume = default_volume
+        self.url = url
+        self.clip_url = clip_url
+        self.clip_volume = clip_volume
+        self.clip_chance = clip_chance
+        self.csrf = csrf
+
+
+class _EditAssetForm:
+    """Bundled form fields for the edit-asset endpoint."""
+
+    def __init__(
+        self,
+        name: str = Form(...),
+        default_volume: str = Form(""),
+        url: str = Form(""),
+        clip_url: list[str] = Form([]),
+        clip_volume: list[str] = Form([]),
+        clip_chance: list[str] = Form([]),
+        csrf: str = Form(...),
+    ) -> None:
+        self.name = name
+        self.default_volume = default_volume
+        self.url = url
+        self.clip_url = clip_url
+        self.clip_volume = clip_volume
+        self.clip_chance = clip_chance
+        self.csrf = csrf
 
 
 def _parse_float(raw: str, default: float) -> float:
@@ -43,9 +89,7 @@ def _usage_counts(
         return {}
     rows = session.exec(
         select(ChannelSound.sound_id, func.count(ChannelSound.id))  # pylint: disable=not-callable
-        .where(
-            ChannelSound.sound_id.in_(sound_ids)  # type: ignore[attr-defined]
-        )
+        .where(col(ChannelSound.sound_id).in_(sound_ids))
         .group_by(ChannelSound.sound_id)
     ).all()
     return dict(rows)
@@ -57,7 +101,7 @@ def _using_channels(session: Session, sound_id: int) -> list[str]:
         select(Channel.slug)
         .join(
             ChannelSound,
-            ChannelSound.channel_id == Channel.id,  # type: ignore[arg-type]
+            col(ChannelSound.channel_id) == col(Channel.id),
         )
         .where(ChannelSound.sound_id == sound_id)
         .distinct()
@@ -108,9 +152,7 @@ def _clips_map(session: Session, sound_ids: list[int]) -> dict[int, list[str]]:
     if not sound_ids:
         return {}
     rows = session.exec(
-        select(SoundClip).where(
-            SoundClip.sound_id.in_(sound_ids)  # type: ignore[attr-defined]
-        )
+        select(SoundClip).where(col(SoundClip.sound_id).in_(sound_ids))
     ).all()
     result: dict[int, list[str]] = {}
     for clip in rows:
@@ -143,9 +185,7 @@ def _added_sound_ids(
         return set()
     rows = session.exec(
         select(ChannelSound.sound_id).where(
-            ChannelSound.channel_id.in_(  # type: ignore[attr-defined]
-                channel_ids
-            )
+            col(ChannelSound.channel_id).in_(channel_ids)
         )
     ).all()
     return set(rows)
@@ -163,7 +203,7 @@ async def library_index(
     stmt = select(Sound).order_by(Sound.name)
     if term:
         like = f"%{term}%"
-        stmt = stmt.where(Sound.name.ilike(like))  # type: ignore[attr-defined]
+        stmt = stmt.where(col(Sound.name).ilike(like))
     sounds = list(session.exec(stmt).all())
     counts = _usage_counts(session, [s.id for s in sounds if s.id])
     random_ids = [s.id for s in sounds if s.is_random and s.id]
@@ -199,41 +239,35 @@ async def create_asset(
     request: Request,
     session: Session = Depends(get_session),
     user: User = Depends(require_user),
-    name: str = Form(...),
-    is_random: str | None = Form(None),
-    default_volume: str = Form(""),
-    url: str = Form(""),
-    clip_url: list[str] = Form([]),
-    clip_volume: list[str] = Form([]),
-    clip_chance: list[str] = Form([]),
-    csrf: str = Form(...),
+    form: _CreateAssetForm = Depends(),
 ) -> RedirectResponse:
     """Create a single or random multi-clip library asset."""
-    require_csrf(request, csrf)
-    name = name.strip()
+    require_csrf(request, form.csrf)
+    name = form.name.strip()
     if not name:
         flash(request, "Asset name is required.", "error")
         return RedirectResponse("/library", status_code=303)
     if session.exec(select(Sound).where(Sound.name == name)).first():
         flash(request, f"Asset name '{name}' is already taken.", "error")
         return RedirectResponse("/library", status_code=303)
-    dvol = _parse_float(default_volume, 0.5)
-    random = is_random is not None
-    if not random and not url.strip():
+    dvol = _parse_float(form.default_volume, 0.5)
+    random = form.is_random is not None
+    if not random and not form.url.strip():
         flash(request, "URL is required for a single asset.", "error")
         return RedirectResponse("/library", status_code=303)
     sound = Sound(
         name=name,
         default_volume=dvol,
         is_random=random,
-        url=None if random else url.strip(),
+        url=None if random else form.url.strip(),
         created_by=user.id,
     )
     session.add(sound)
     session.flush()
     if random:
         added = _replace_clips(
-            session, sound, clip_url, clip_volume, clip_chance, dvol
+            session, sound,
+            form.clip_url, form.clip_volume, form.clip_chance, dvol,
         )
         if not added:
             session.rollback()
@@ -255,20 +289,14 @@ async def edit_asset(
     request: Request,
     session: Session = Depends(get_session),
     user: User = Depends(require_user),
-    name: str = Form(...),
-    default_volume: str = Form(""),
-    url: str = Form(""),
-    clip_url: list[str] = Form([]),
-    clip_volume: list[str] = Form([]),
-    clip_chance: list[str] = Form([]),
-    csrf: str = Form(...),
+    form: _EditAssetForm = Depends(),
 ) -> RedirectResponse:
     """Update an asset; changes apply to every channel linked to it."""
-    require_csrf(request, csrf)
+    require_csrf(request, form.csrf)
     sound = session.get(Sound, sound_id)
     if not sound:
         raise HTTPException(status_code=404, detail="Asset not found")
-    name = name.strip()
+    name = form.name.strip()
     if not name:
         flash(request, "Asset name is required.", "error")
         return RedirectResponse("/library", status_code=303)
@@ -278,22 +306,23 @@ async def edit_asset(
     if clash:
         flash(request, f"Asset name '{name}' is already taken.", "error")
         return RedirectResponse("/library", status_code=303)
-    dvol = _parse_float(default_volume, sound.default_volume)
+    dvol = _parse_float(form.default_volume, sound.default_volume)
     sound.name = name
     sound.default_volume = dvol
     if sound.is_random:
         added = _replace_clips(
-            session, sound, clip_url, clip_volume, clip_chance, dvol
+            session, sound,
+            form.clip_url, form.clip_volume, form.clip_chance, dvol,
         )
         if not added:
             session.rollback()
             flash(request, "A random asset needs at least one clip.", "error")
             return RedirectResponse("/library", status_code=303)
     else:
-        if not url.strip():
+        if not form.url.strip():
             flash(request, "URL is required for a single asset.", "error")
             return RedirectResponse("/library", status_code=303)
-        sound.url = url.strip()
+        sound.url = form.url.strip()
     session.add(sound)
     session.commit()
     flash(request, f"Saved asset '{name}'.", "success")

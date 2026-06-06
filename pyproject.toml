@@ -29,6 +29,7 @@ soundlist = "app.main:main"
 dev = [
     "ruff>=0.6,<1.0",
     "pylint>=3.3,<4.0",
+    "pyright>=1.1,<2.0",
 ]
 
 
@@ -67,12 +68,28 @@ disable = [
 ]
 
 [tool.pylint.design]
-# FastAPI route handlers use Form + Depends; bump limits to accommodate
-max-args = 15
+# Form DI classes have 8 fields; route handlers stay under 7
+max-args = 9
 max-locals = 20
 max-attributes = 12
 
 [dependency-groups]
 dev = [
     "pytest>=9.0.3",
+    "pyright>=1.1,<2.0",
+    "httpx2>=2.0,<3.0",
 ]
+
+[tool.pytest.ini_options]
+filterwarnings = [
+    "error",
+    # starlette.testclient prefers httpx2; warning silenced while httpx
+    # 0.x is still the runtime transport (revisit when httpx2 fully adopted)
+    "ignore::starlette.testclient.StarletteDeprecationWarning",
+]
+
+[tool.pyright]
+pythonVersion = "3.11"
+typeCheckingMode = "basic"
+venvPath = "."
+venv = ".venv"

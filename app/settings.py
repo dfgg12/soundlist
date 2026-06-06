@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -24,6 +25,16 @@ class Settings(BaseSettings):
     admin_logins: str = ""
 
     database_url: str = "sqlite:///./soundlist.db"
+
+    @field_validator("database_url")
+    @classmethod
+    def _sqlite_only(cls, v: str) -> str:
+        """Reject non-SQLite database URLs at startup."""
+        if not v.startswith("sqlite"):
+            raise ValueError(
+                "only SQLite is supported; got non-sqlite database_url"
+            )
+        return v
 
     app_env: str = "development"
 
