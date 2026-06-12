@@ -1,4 +1,6 @@
 CLAUDE.md
+# Keep the committed project agent guide (un-ignore the root one).
+!/CLAUDE.md
 .env
 *.db
 *.db-shm

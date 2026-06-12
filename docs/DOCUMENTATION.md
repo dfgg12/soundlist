@@ -74,6 +74,21 @@ Complete documentation for the Soundlist management panel. Start here to find wh
    - Monitoring
    - Configuration management
 
+3. **[SECURITY.md](SECURITY.md)** - Security model and invariants
+   - Static file allowlist (keeps secrets off the wire)
+   - Secrets handling (SecretStr)
+   - Auth, RBAC, and CSRF
+   - Invariants to preserve and hardening log
+
+### I'm an AI Agent Working in This Repo
+
+1. **[../CLAUDE.md](../CLAUDE.md)** - Agent guide
+   - Hard invariants not to break
+   - House style and workflow
+   - Where things live and known gotchas
+
+2. **[SECURITY.md](SECURITY.md)** - Full security invariants
+
 ### I Need API Details
 
 1. **[API.md](API.md)** - Complete endpoint documentation
