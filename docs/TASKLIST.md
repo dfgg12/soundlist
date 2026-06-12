@@ -93,6 +93,10 @@ Status: M1-M6 done. Stretch/debt items remain.
       `max-args` reverted from 15 to 9 (form DI class init ceiling).
 - [x] D5 T6.5 lint pass complete: ruff + pylint 10.00/10, 79-col enforced,
       `on_event` -> lifespan, `func.count` false positive suppressed inline.
+- [x] D6 SECURITY: root `StaticFiles` mount served whole project (.env,
+      soundlist.db, .git, source) and shadowed `/healthz`. Replaced with
+      explicit `_PUBLIC_FILES` allowlist route in main.py; added
+      tests/test_static.py. See ARCHITECTURE.md "Static File Serving".
 
 ## Definition of done per task
 

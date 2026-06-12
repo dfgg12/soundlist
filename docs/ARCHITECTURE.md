@@ -529,6 +529,31 @@ channel = db.query(Channel).filter_by(slug=slug).first()
 # query(f"SELECT * FROM channel WHERE slug = '{slug}'")
 ```
 
+### Static File Serving
+
+```
+Public board assets are served from the project root via an explicit
+allowlist, NOT a directory mount:
+
+_PUBLIC_FILES = {index.html, styles.css, app.js, marquee.html}
+
+GET /<filename>
+  |
+  v
+If filename not in _PUBLIC_FILES -> 404
+Else -> FileResponse(root / filename)
+
+Rationale:
+- Mounting the whole project root (StaticFiles(directory=root)) would
+  expose .env, soundlist.db, .git/, uv.lock, and all app/ source over
+  HTTP. The allowlist keeps only the four board files reachable.
+- The single-segment route /<filename> is registered after all API
+  routers and after /healthz, so it never shadows them; it also cannot
+  match slashed paths (lists/*.json stays with the lists router).
+- Regression coverage: tests/test_static.py asserts the board files
+  return 200 and that secrets/source return 404.
+```
+
 ## Testing Architecture
 
 ### Test Structure
