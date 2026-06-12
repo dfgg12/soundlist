@@ -140,11 +140,13 @@ def _resolve_sound(
 
 
 def _next_position(session: Session, channel_id: int) -> int:
-    """Return position value for a new ChannelSound (append to end)."""
-    rows = session.exec(
-        select(ChannelSound).where(ChannelSound.channel_id == channel_id)
-    ).all()
-    return len(rows)
+    """Return next position for a new ChannelSound (max + 1, or 0)."""
+    top = session.exec(
+        select(func.max(ChannelSound.position)).where(
+            ChannelSound.channel_id == channel_id
+        )
+    ).first()
+    return top + 1 if top is not None else 0
 
 
 # ---------------------------------------------------------------------------

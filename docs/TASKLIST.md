@@ -97,6 +97,12 @@ Status: M1-M6 done. Stretch/debt items remain.
       soundlist.db, .git, source) and shadowed `/healthz`. Replaced with
       explicit `_PUBLIC_FILES` allowlist route in main.py; added
       tests/test_static.py. See ARCHITECTURE.md "Static File Serving".
+- [x] D7 `twitch_client_secret` and `session_secret_key` are now
+      Pydantic `SecretStr` (masked in repr/tracebacks); call sites use
+      `.get_secret_value()`. Matches ARCHITECTURE.md secrets claim.
+- [x] D8 New-trigger position now computed as `max(position) + 1` in
+      panel.add_sound and library.add_to_channel; the old `len(rows)`
+      could reuse a position after a mid-list delete.
 
 ## Definition of done per task
 

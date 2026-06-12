@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from pydantic import field_validator
+from pydantic import SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -16,10 +16,12 @@ class Settings(BaseSettings):
     )
 
     twitch_client_id: str = ""
-    twitch_client_secret: str = ""
+    twitch_client_secret: SecretStr = SecretStr("")
     twitch_redirect_uri: str = "http://localhost:8000/auth/callback"
 
-    session_secret_key: str = "insecure-dev-key-change-in-production"
+    session_secret_key: SecretStr = SecretStr(
+        "insecure-dev-key-change-in-production"
+    )
 
     # Comma-separated Twitch logins seeded as admins on startup
     admin_logins: str = ""

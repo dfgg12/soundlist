@@ -61,7 +61,7 @@ _PUBLIC_FILES = frozenset(
 
 app.add_middleware(
     SessionMiddleware,
-    secret_key=settings.session_secret_key,
+    secret_key=settings.session_secret_key.get_secret_value(),
     session_cookie="soundlist_session",
     max_age=60 * 60 * 24 * 7,  # 7 days
     https_only=settings.is_production,

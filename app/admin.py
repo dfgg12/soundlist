@@ -219,7 +219,8 @@ async def _app_access_token() -> str:
             "https://id.twitch.tv/oauth2/token",
             data={
                 "client_id": settings.twitch_client_id,
-                "client_secret": settings.twitch_client_secret,
+                "client_secret":
+                    settings.twitch_client_secret.get_secret_value(),
                 "grant_type": "client_credentials",
             },
         )

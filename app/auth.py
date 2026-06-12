@@ -23,7 +23,7 @@ oauth = OAuth()
 oauth.register(
     name="twitch",
     client_id=settings.twitch_client_id,
-    client_secret=settings.twitch_client_secret,
+    client_secret=settings.twitch_client_secret.get_secret_value(),
     authorize_url="https://id.twitch.tv/oauth2/authorize",
     access_token_url="https://id.twitch.tv/oauth2/token",
     # Twitch requires credentials as body params, not HTTP Basic auth

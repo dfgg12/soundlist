@@ -408,11 +408,11 @@ async def add_to_channel(
             "error",
         )
         return RedirectResponse("/library", status_code=303)
-    rows = session.exec(
-        select(ChannelSound).where(
+    top = session.exec(
+        select(func.max(ChannelSound.position)).where(
             ChannelSound.channel_id == channel_id
         )
-    ).all()
+    ).first()
     cs = ChannelSound(
         channel_id=channel_id,
         sound_id=sound_id,
@@ -421,7 +421,7 @@ async def add_to_channel(
         chance="100%",
         trigger_cooldown=0,
         enabled=True,
-        position=len(rows),
+        position=top + 1 if top is not None else 0,
     )
     session.add(cs)
     session.commit()
