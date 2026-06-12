@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -10,14 +11,16 @@ from pathlib import Path
 import uvicorn
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, JSONResponse
+from sqlmodel import Session, select
 from starlette.middleware.sessions import SessionMiddleware
 
 from app.admin import router as admin_router
 from app.auth import router as auth_router
 from app.auth import seed_admins
-from app.db import create_db_and_tables
+from app.db import create_db_and_tables, engine
 from app.library import router as library_router
 from app.lists import router as lists_router
+from app.models import IconTrigger
 from app.panel import router as panel_router
 from app.settings import settings
 
@@ -28,12 +31,32 @@ logging.basicConfig(
 log = logging.getLogger(__name__)
 
 
+def _seed_icon_triggers() -> None:
+    """Import IconTriggers2.json into DB if the table is empty."""
+    path = Path(settings.lists_dir) / "internals" / "IconTriggers2.json"
+    if not path.exists():
+        return
+    with Session(engine) as session:
+        if session.exec(select(IconTrigger)).first() is not None:
+            return
+        data: dict[str, str] = json.loads(path.read_text(encoding="utf-8"))
+        for word, url in data.items():
+            session.add(
+                IconTrigger(
+                    trigger_word=word.strip(), icon_url=url.strip()
+                )
+            )
+        session.commit()
+    log.info("seeded %d icon triggers from IconTriggers2.json", len(data))
+
+
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
-    """Run startup tasks: create tables and seed admins."""
+    """Run startup tasks: create tables, seed admins, seed icon triggers."""
     log.info("starting soundlist (env=%s)", settings.app_env)
     create_db_and_tables()
     seed_admins()
+    _seed_icon_triggers()
     log.info("db tables ready")
     yield
 

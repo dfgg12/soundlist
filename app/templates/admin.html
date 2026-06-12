@@ -41,6 +41,7 @@
         <th>Display name</th>
         <th>Owner</th>
         <th>Assign owner</th>
+        <th>Avatar URL</th>
         <th></th>
       </tr>
     </thead>
@@ -55,6 +56,13 @@
             <input type="hidden" name="csrf" value="{{ csrf }}">
             <input type="text" name="owner_login" placeholder="login or blank to unassign" style="width:200px">
             <button type="submit" class="btn btn-secondary" style="font-size:12px;padding:.2rem .5rem">Set</button>
+          </form>
+        </td>
+        <td>
+          <form method="post" action="/admin/channel/{{ ch.slug }}/set-avatar" style="display:flex;gap:.35rem">
+            <input type="hidden" name="csrf" value="{{ csrf }}">
+            <input type="text" name="avatar_url" value="{{ ch.avatar_url }}" placeholder="https://..." style="width:260px">
+            <button type="submit" class="btn btn-secondary" style="font-size:12px;padding:.2rem .5rem">Save</button>
           </form>
         </td>
         <td>
@@ -109,6 +117,64 @@
   </table>
   {% else %}
   <p style="color:#777">No users yet.</p>
+  {% endif %}
+</div>
+
+<div class="card" id="icon-triggers">
+  <h2 style="margin-top:0">Icon triggers ({{ icon_triggers|length }})</h2>
+  <form method="post" action="/admin/icon-trigger/create"
+        style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:flex-end;margin-bottom:1rem">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <div>
+      <label style="display:block;font-size:12px;color:#555;margin-bottom:.2rem">Trigger word</label>
+      <input type="text" name="trigger_word" placeholder="e.g. KEKW" required style="width:160px">
+    </div>
+    <div>
+      <label style="display:block;font-size:12px;color:#555;margin-bottom:.2rem">Icon URL</label>
+      <input type="text" name="icon_url" placeholder="https://7tv.app/emotes/..." required style="width:320px">
+    </div>
+    <button type="submit" class="btn btn-primary">Add</button>
+  </form>
+
+  {% if icon_triggers %}
+  <table>
+    <thead>
+      <tr>
+        <th>Trigger word</th>
+        <th>Icon URL</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for it in icon_triggers %}
+      <tr>
+        <td>
+          <form method="post" action="/admin/icon-trigger/{{ it.id }}/edit"
+                style="display:flex;gap:.35rem;align-items:center">
+            <input type="hidden" name="csrf" value="{{ csrf }}">
+            <input type="text" name="trigger_word" value="{{ it.trigger_word }}"
+                   required style="width:150px;font-size:13px">
+            <input type="text" name="icon_url" value="{{ it.icon_url }}"
+                   required style="width:340px;font-size:13px">
+            <button type="submit" class="btn btn-secondary"
+                    style="font-size:12px;padding:.2rem .5rem">Save</button>
+          </form>
+        </td>
+        <td></td>
+        <td>
+          <form method="post" action="/admin/icon-trigger/{{ it.id }}/delete"
+                onsubmit="return confirm('Delete icon trigger \'{{ it.trigger_word }}\'?')">
+            <input type="hidden" name="csrf" value="{{ csrf }}">
+            <button type="submit" class="btn btn-danger"
+                    style="font-size:12px;padding:.2rem .5rem">Delete</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p style="color:#777">No icon triggers yet.</p>
   {% endif %}
 </div>
 {% endblock %}

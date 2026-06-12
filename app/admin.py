@@ -16,7 +16,7 @@ from app.auth import require_user
 from app.csrf import csrf_token, require_csrf
 from app.db import get_session
 from app.flash import flash, get_flashes
-from app.models import Channel, ChannelSound, User
+from app.models import Channel, ChannelSound, IconTrigger, User
 from app.settings import settings
 
 log = logging.getLogger(__name__)
@@ -39,7 +39,7 @@ async def admin_index(
     session: Session = Depends(get_session),
     admin: User = Depends(_require_admin),
 ) -> HTMLResponse:
-    """Render admin panel with user and channel tables."""
+    """Render admin panel with user, channel, and icon trigger tables."""
     users = list(
         session.exec(select(User).order_by(func.lower(User.login))).all()
     )
@@ -54,6 +54,11 @@ async def admin_index(
             owner = session.get(User, ch.owner_id)
             if owner:
                 owner_map[ch.id] = owner.login
+    icon_triggers = list(
+        session.exec(
+            select(IconTrigger).order_by(IconTrigger.trigger_word)
+        ).all()
+    )
     return templates.TemplateResponse(
         request,
         "admin.html",
@@ -62,6 +67,7 @@ async def admin_index(
             "users": users,
             "channels": channels,
             "owner_map": owner_map,
+            "icon_triggers": icon_triggers,
             "csrf": csrf_token(request),
             "flashes": get_flashes(request),
         },
@@ -205,6 +211,123 @@ async def toggle_admin(
     state = "granted" if target.is_admin else "revoked"
     flash(request, f"Admin {state} for {login}.", "success")
     return RedirectResponse("/admin", status_code=303)
+
+
+@router.post("/channel/{slug}/set-avatar")
+async def set_channel_avatar(
+    slug: str,
+    request: Request,
+    session: Session = Depends(get_session),
+    admin: User = Depends(_require_admin),
+    avatar_url: str = Form(""),
+    csrf: str = Form(...),
+) -> RedirectResponse:
+    """Manually set a channel's avatar URL."""
+    require_csrf(request, csrf)
+    channel = session.exec(
+        select(Channel).where(Channel.slug == slug)
+    ).first()
+    if not channel:
+        raise HTTPException(status_code=404, detail="Channel not found")
+    channel.avatar_url = avatar_url.strip()
+    session.add(channel)
+    session.commit()
+    log.info("admin %s set avatar for %s", admin.login, slug)
+    flash(request, f"Avatar updated for '{slug}'.", "success")
+    return RedirectResponse("/admin", status_code=303)
+
+
+# ---------------------------------------------------------------------------
+# Icon trigger CRUD
+# ---------------------------------------------------------------------------
+
+
+@router.post("/icon-trigger/create")
+async def create_icon_trigger(
+    request: Request,
+    session: Session = Depends(get_session),
+    admin: User = Depends(_require_admin),
+    trigger_word: str = Form(...),
+    icon_url: str = Form(...),
+    csrf: str = Form(...),
+) -> RedirectResponse:
+    """Create a new global icon trigger mapping."""
+    require_csrf(request, csrf)
+    trigger_word = trigger_word.strip()
+    icon_url = icon_url.strip()
+    if not trigger_word or not icon_url:
+        flash(request, "Trigger word and icon URL are required.", "error")
+        return RedirectResponse("/admin#icon-triggers", status_code=303)
+    existing = session.exec(
+        select(IconTrigger).where(IconTrigger.trigger_word == trigger_word)
+    ).first()
+    if existing:
+        flash(request, f"Trigger '{trigger_word}' already exists.", "error")
+        return RedirectResponse("/admin#icon-triggers", status_code=303)
+    session.add(IconTrigger(trigger_word=trigger_word, icon_url=icon_url))
+    session.commit()
+    log.info("admin %s created icon trigger %s", admin.login, trigger_word)
+    flash(request, f"Icon trigger '{trigger_word}' created.", "success")
+    return RedirectResponse("/admin#icon-triggers", status_code=303)
+
+
+@router.post("/icon-trigger/{trigger_id}/edit")
+async def edit_icon_trigger(
+    trigger_id: int,
+    request: Request,
+    session: Session = Depends(get_session),
+    admin: User = Depends(_require_admin),
+    trigger_word: str = Form(...),
+    icon_url: str = Form(...),
+    csrf: str = Form(...),
+) -> RedirectResponse:
+    """Edit an existing icon trigger's word or URL."""
+    require_csrf(request, csrf)
+    trigger = session.get(IconTrigger, trigger_id)
+    if not trigger:
+        raise HTTPException(status_code=404, detail="Icon trigger not found")
+    trigger_word = trigger_word.strip()
+    icon_url = icon_url.strip()
+    if not trigger_word or not icon_url:
+        flash(request, "Trigger word and icon URL are required.", "error")
+        return RedirectResponse("/admin#icon-triggers", status_code=303)
+    conflict = session.exec(
+        select(IconTrigger).where(
+            IconTrigger.trigger_word == trigger_word,
+            IconTrigger.id != trigger_id,
+        )
+    ).first()
+    if conflict:
+        flash(request, f"Trigger '{trigger_word}' already exists.", "error")
+        return RedirectResponse("/admin#icon-triggers", status_code=303)
+    trigger.trigger_word = trigger_word
+    trigger.icon_url = icon_url
+    session.add(trigger)
+    session.commit()
+    log.info("admin %s edited icon trigger %d", admin.login, trigger_id)
+    flash(request, f"Icon trigger '{trigger_word}' updated.", "success")
+    return RedirectResponse("/admin#icon-triggers", status_code=303)
+
+
+@router.post("/icon-trigger/{trigger_id}/delete")
+async def delete_icon_trigger(
+    trigger_id: int,
+    request: Request,
+    session: Session = Depends(get_session),
+    admin: User = Depends(_require_admin),
+    csrf: str = Form(...),
+) -> RedirectResponse:
+    """Delete an icon trigger mapping."""
+    require_csrf(request, csrf)
+    trigger = session.get(IconTrigger, trigger_id)
+    if not trigger:
+        raise HTTPException(status_code=404, detail="Icon trigger not found")
+    word = trigger.trigger_word
+    session.delete(trigger)
+    session.commit()
+    log.info("admin %s deleted icon trigger %s", admin.login, word)
+    flash(request, f"Icon trigger '{word}' deleted.", "success")
+    return RedirectResponse("/admin#icon-triggers", status_code=303)
 
 
 # ---------------------------------------------------------------------------

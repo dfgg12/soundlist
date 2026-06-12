@@ -89,6 +89,18 @@ class SoundClip(SQLModel, table=True):
     sound: Sound | None = Relationship(back_populates="clips")
 
 
+class IconTrigger(SQLModel, table=True):
+    """Global mapping from a trigger word to an emote icon URL."""
+
+    id: int | None = Field(default=None, primary_key=True)
+    trigger_word: str = Field(unique=True, index=True)
+    icon_url: str
+    created_at: datetime = Field(
+        default_factory=_utcnow,
+        sa_column=Column(SADateTime(timezone=True), default=_utcnow),
+    )
+
+
 class ChannelSound(SQLModel, table=True):
     """A trigger word wired to a Sound on a specific Channel."""
 
