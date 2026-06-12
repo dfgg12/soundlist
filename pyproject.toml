@@ -20,6 +20,7 @@ dependencies = [
     "itsdangerous>=2.2,<3.0",
     "python-multipart>=0.0.12,<1.0",
     "pydantic-settings>=2.4,<3.0",
+    "alembic>=1.13,<2.0",
 ]
 
 [project.scripts]
@@ -46,12 +47,15 @@ ignore = [
 
 [tool.ruff.lint.isort]
 known-first-party = ["app"]
+known-third-party = ["alembic"]
 
 [tool.pylint.main]
 py-version = "3.11"
 jobs = 1
 # sqlmodel/pydantic use dynamic attrs; skip import analysis
-ignored-modules = ["sqlmodel", "pydantic", "pydantic_settings", "authlib"]
+ignored-modules = [
+    "sqlmodel", "pydantic", "pydantic_settings", "authlib", "alembic"
+]
 
 [tool.pylint.format]
 max-line-length = 79
@@ -65,6 +69,8 @@ disable = [
     "unused-argument",
     # FastAPI Form/Depends DI pattern inherently exceeds positional limit
     "too-many-positional-arguments",
+    # ruff isort is authoritative; pylint misclassifies alembic as first-party
+    "wrong-import-order",
 ]
 
 [tool.pylint.design]

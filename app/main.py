@@ -17,7 +17,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from app.admin import router as admin_router
 from app.auth import router as auth_router
 from app.auth import seed_admins
-from app.db import create_db_and_tables, engine
+from app.db import engine, run_migrations
 from app.library import router as library_router
 from app.lists import router as lists_router
 from app.models import IconTrigger
@@ -54,10 +54,10 @@ def _seed_icon_triggers() -> None:
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     """Run startup tasks: create tables, seed admins, seed icon triggers."""
     log.info("starting soundlist (env=%s)", settings.app_env)
-    create_db_and_tables()
+    run_migrations()
     seed_admins()
     _seed_icon_triggers()
-    log.info("db tables ready")
+    log.info("db migrations applied")
     yield
 
 
